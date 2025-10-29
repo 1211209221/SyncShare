@@ -1,0 +1,289 @@
+<!-- Font Awesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-RandomHashHere" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+	html {
+		scroll-behavior: smooth;
+	}
+
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-weight: 700;
+	}
+
+	body {
+		/* font-family: 'Open Sans', sans-serif; */
+		font-family: 'Lato', sans-serif;
+		/* font-family: 'Poppins', sans-serif; */
+		background: #f3f4f6;
+	}
+
+	input, textarea, select{
+		font-family: 'Lato', sans-serif;
+		background-color: #F1F0F7;
+		border: 0;
+		border-radius: 2px;
+		padding: 3px 10px;
+	}
+
+	input:focus, textarea, select:focus{
+		outline: none;
+	}
+
+	/* .wrapper {
+		background: #fff;
+		margin-bottom: 270px;
+		box-shadow: 0px 25px 10px -15px rgba(0,0,0,0.08); 
+	} */
+
+	select, input[type='date']{
+		width: 195px;
+	}
+
+	.footer{
+		padding: 10px 0px;
+		background: white;
+		box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+		text-align: left;
+	}
+
+	.navbar {
+		padding: 10px 0px;
+		background: white;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+	}
+
+	.navbar .nav-item {
+		margin: 0 .75rem 0;
+		display: flex;
+		align-items: center;
+	}
+
+	.navbar-brand a {
+		box-shadow: 0px 25px 10px -15px rgba(0, 0, 0, 0.08);
+	}
+
+	.nav-dropdown {
+		border-radius: 10px;
+		border: 0;
+		padding: 0 1.2rem;
+		background: linear-gradient(to right, #8914fe 0%, #8063f5 100%);
+		box-shadow: 0px 25px 10px -10px rgba(0, 0, 0, 0.08);
+	}
+
+	.nav-dropdown a.dropdown-link {
+		color: #f5f5f5 !important;
+	}
+
+	.btn-primary {
+		color: #fff;
+		background: linear-gradient(to right, #8914fe 0%, #8063f5 100%) !important;
+		border-color: #6F42C2 !important;
+	}
+
+	.btn-primary:hover {
+		color: #fff;
+		background-color: #906BD4 !important;
+		border-color: #906BD4 !important;
+		-webkit-box-shadow: none;
+		box-shadow: none;
+	}
+
+	.btn-primary:focus {
+		box-shadow: 0 0 0 0.2rem rgba(111, 66, 194, .5) !important;
+	}
+	.sidebar{
+		background-color: #352f39 !important;
+		width: 250px;
+	}
+	.navbar-brand{
+		font-size: 27px;
+		color: white !important;
+		text-align: center;
+		margin: 0 !important;
+		padding-bottom: 17px;
+	}
+	.nav-link.active{
+		background-color: #974fde !important;
+		transition: 0.15s;
+	}
+	.nav-link.active:hover{
+		background-color:rgb(130, 60, 199) !important;
+	}
+	.nav-pills li, .nav-pills li a{
+		width: 100%;
+		margin: 0px !important;
+		color: white;
+	}
+	.nav-pills li a{
+		padding-top: 15px;
+		padding-bottom: 15px;
+	}
+	.nav-pills .nav-link.active{
+		border-radius: 0px !important;
+	}
+	.nav-link.active{
+		background-color: #974fde !important;
+	}
+	table, th, tr, td{
+		border: none !important;
+		outline: 0 !important;
+	}
+	thead{
+		background-color:rgb(230, 228, 232);
+	}
+	.table-container{
+		background-color: white;
+		border-radius: 10px;
+		padding: 20px 40px;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+	}
+	.table{
+		font-weight: bold;
+	}
+	thead th:first-child {
+		border-top-left-radius: 8px; /* adjust radius as needed */
+	}
+
+	thead th:last-child {
+		border-top-right-radius: 8px; /* adjust radius as needed */
+	}
+	tbody tr:nth-child(odd) {
+    background-color: white;
+	}
+
+	tbody tr:nth-child(even) {
+		background-color: #f2f2f2; /* light grey */
+	}
+
+	button{
+		background-color: #974fde !important;
+		transition: 0.15s;
+		border: none;
+		border-radius: 8px;
+		padding: 8px 19px;
+		color: white;
+		font-size: 17px;
+		font-weight: bold;
+	}
+	button:hover{
+		background-color:rgb(130, 60, 199) !important;
+		transform: scale(1.05);
+		outline: none;
+	}
+	.nav-pills li a i {
+		padding-right:5px;
+	}
+	td i{
+		padding-right: 10px;
+		color: black;
+		transition: 0.15s;
+	}
+	td i:hover{
+		padding-right: 10px;
+		color: #974fde;
+		transform: scale(1.2);
+	}
+	.success-alert{
+		background-color: #d5ccff !important;
+    	color: #2b0082 !important;
+		position: relative;
+		padding: .75rem 1.25rem;
+		margin-bottom: 1rem;
+		border: 1px solid transparent;
+		border-radius: .25rem;
+		text-align: center;
+		padding: 10px 20px;
+		margin: 10px 20px;
+		border-radius: 5px;
+	}
+	a:hover{
+		text-decoration: none !important;
+	}
+	input, textarea{
+		font-family: 'Lato', sans-serif;
+		background-color: #F1F0F7;
+		border: 0;
+		border-radius: 2px;
+		padding: 3px 10px;
+	}
+	.input-container {
+		display: flex
+	;
+		justify-content: space-between;
+		margin-bottom: 5px;
+	}
+	.details-container{
+		background-color: white;
+		border-radius: 10px;
+		padding: 20px 40px;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+		background: white;
+		padding: 20px 20px;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+		border-radius: 10px;
+		width: 100%;
+		text-align: center;
+	}
+	#appointmentForm span{
+		font-weight: bold;
+	}
+	#appointmentForm textarea{
+		height: 150px;
+	}
+	.submit-button{
+		padding: 0.5em 1em;
+		font-size: 1rem;
+		border: 0px;
+		background-color: #6F42C2 !important;
+		color: white;
+		border-radius: 4px;
+		margin: 0px;
+		margin-top: 5px;
+		transition: 0.2s;
+		width: 100%;
+		font-weight: bold;
+		font-family: 'Lato', sans-serif;
+	}
+	.submit-button:hover{
+		transform: scale(1.02);
+	}
+	.back-button{
+		color: #212529;
+		transition: 0.15s;
+		cursor: pointer;
+	}
+	.back-button:hover{
+		color: #974fde !important;
+		transform: scale(1.02);
+	}
+</style>
+	<nav class="navbar navbar-light bg-light flex-column vh-100 sidebar">
+		<div class="flex-column" style="width: 100%; display: flex;">
+			<a class="navbar-brand" href="admin-list.php">Sync <b>Share</b></a>
+			<ul class="nav nav-pills flex-column mb-auto">
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'posts-list.php'): ?> active <?php endif; ?>" href="posts.php">
+						<i class="fas fa-user-shield me-2"></i> Posts
+					</a>
+				</li>
+				<li>
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'doctor-list.php'): ?> active <?php endif; ?>" href="doctor-list.php">
+						<i class="fas fa-user-md me-2"></i> Doctor List
+					</a>
+				</li>
+				<li>
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'patient-list.php'): ?> active <?php endif; ?>" href="patient-list.php">
+						<i class="fas fa-users me-2"></i> Patient List
+					</a>
+				</li>
+				<li>
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'admin-schedule.php'): ?> active <?php endif; ?>" href="admin-schedule.php">
+						<i class="fas fa-calendar-check me-2"></i> Appointments
+					</a>
+				</li>
+			</ul>
+		</div>
+	</nav>
