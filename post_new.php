@@ -1,6 +1,7 @@
 <?php
 session_start();
 
+// 🔐 Redirect to login if token not found
 if (!isset($_SESSION['token'])) {
     header("Location: login.php");
     exit;
@@ -17,7 +18,7 @@ echo "✅ Token in session: " . substr($token, 0, 20) . "...<br><br>";
 $ch = curl_init('https://socialbu.com/api/v1/accounts');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_FOLLOWLOCATION => false,
+    CURLOPT_FOLLOWLOCATION => false, // prevent 302 redirect masking
     CURLOPT_HTTPHEADER => [
         'Authorization: Bearer ' . $token,
         'Accept: application/json'
@@ -42,65 +43,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $content = trim($_POST['content'] ?? '');
     $publish_at_input = trim($_POST['publish_at'] ?? '');
     $draft = isset($_POST['draft']);
-    $attachments = [];
-
-    // Upload images if any
-    if (!empty($_FILES['images']['name'][0])) {
-        foreach ($_FILES['images']['tmp_name'] as $key => $tmp_name) {
-            $filename = $_FILES['images']['name'][$key];
-            $filepath = $_FILES['images']['tmp_name'][$key];
-
-            $ch = curl_init("https://socialbu.com/api/v1/media/upload");
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Authorization: Bearer ' . $token,
-                    'Accept: application/json'
-                ],
-                CURLOPT_POSTFIELDS => [
-                    'file' => new CURLFile($filepath, mime_content_type($filepath), $filename)
-                ]
-            ]);
-            $uploadResponse = curl_exec($ch);
-            $httpcodeUpload = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($httpcodeUpload === 200) {
-                $uploadData = json_decode($uploadResponse, true);
-                // The returned object usually contains 'upload_token' or 'url'
-                $attachments[] = $uploadData['upload_token'] ?? $uploadData['url'] ?? '';
-            } else {
-                $responseMessage .= "<div class='alert alert-danger'>❌ Failed to upload $filename. HTTP $httpcodeUpload</div>";
-            }
-        }
-    }
 
     if (empty($accounts_selected)) {
-        $responseMessage .= "<div class='alert alert-warning'>⚠️ Please select at least one account.</div>";
+        $responseMessage = "<div class='alert alert-warning'>⚠️ Please select at least one account.</div>";
     } elseif (empty($content)) {
-        $responseMessage .= "<div class='alert alert-warning'>⚠️ Post content cannot be empty.</div>";
+        $responseMessage = "<div class='alert alert-warning'>⚠️ Post content cannot be empty.</div>";
     } else {
-        // Convert local Malaysia time to UTC
+        // ✅ Convert local Malaysia time to UTC before sending to API
         if (!empty($publish_at_input)) {
             try {
                 $local = new DateTime($publish_at_input, new DateTimeZone('Asia/Kuala_Lumpur'));
                 $local->setTimezone(new DateTimeZone('UTC'));
                 $publish_at = $local->format('Y-m-d H:i:s');
             } catch (Exception $e) {
-                $publish_at = gmdate("Y-m-d H:i:s");
+                $publish_at = gmdate("Y-m-d H:i:s"); // fallback to current UTC
             }
         } else {
             $publish_at = gmdate("Y-m-d H:i:s");
         }
 
-        // Payload with attachments
+
+        // ✅ Use integer 0 for team_id
         $payload = [
             "accounts" => $accounts_selected,
             "publish_at" => $publish_at,
             "content" => $content,
             "draft" => $draft,
-            "existing_attachments" => $attachments,
+            "existing_attachments" => [],
             "options" => new stdClass(),
             "postback_url" => "",
             "queue_ids" => [],
@@ -126,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $curl_error = curl_error($ch);
         curl_close($ch);
 
-        $responseMessage .= "<h6>🔍 Debug Info</h6>"
+        $responseMessage = "<h6>🔍 Debug Info</h6>"
             . "<pre style='background:#eef;padding:10px;border-radius:8px;'>Payload:\n"
             . htmlspecialchars($json_payload)
             . "\n\nHTTP $httpcode Response:\n"
@@ -136,6 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             . "</pre>";
     }
 }
+
+
 ?>
 
 <!DOCTYPE html>
@@ -160,58 +131,55 @@ footer { text-align: center; margin-top: 25px; color: #888; }
 </head>
 <body>
 <div class="container">
-<h1>📝 Create a New Post</h1>
+  <h1>📝 Create a New Post</h1>
 
-<form method="POST" enctype="multipart/form-data">
+  <form method="POST">
     <div class="mb-3">
-        <label class="form-label">Select Accounts</label>
-        <div class="account-list">
-            <?php if (!empty($accounts)): ?>
-                <?php foreach ($accounts as $acc): ?>
-                    <label class="account-item">
-                        <input type="checkbox" name="accounts[]" value="<?= htmlspecialchars($acc['id']) ?>">
-                        <img src="<?= htmlspecialchars($acc['image']) ?>" alt="icon">
-                        <span><?= htmlspecialchars($acc['_type'] . (!empty($acc['name']) ? " - " . $acc['name'] : '')) ?></span>
-                    </label>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <p class="text-muted">No connected accounts found or error fetching accounts.</p>
-            <?php endif; ?>
-        </div>
+      <label class="form-label">Select Accounts</label>
+      <div class="account-list">
+        <?php if (!empty($accounts)): ?>
+          <?php foreach ($accounts as $acc): ?>
+            <label class="account-item">
+              <input type="checkbox" name="accounts[]" value="<?= htmlspecialchars($acc['id']) ?>">
+              <img src="<?= htmlspecialchars($acc['image']) ?>" alt="icon">
+              <span><?= htmlspecialchars($acc['_type'] . (!empty($acc['name']) ? " - " . $acc['name'] : '')) ?></span>
+            </label>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <p class="text-muted">No connected accounts found or error fetching accounts.</p>
+        <?php endif; ?>
+      </div>
     </div>
 
     <div class="mb-3">
-        <label class="form-label">Post Content</label>
-        <textarea class="form-control" name="content" rows="4" placeholder="Write your post here..." required></textarea>
+      <label class="form-label">Post Content</label>
+      <textarea class="form-control" name="content" rows="4" placeholder="Write your post here..." required></textarea>
     </div>
 
     <div class="mb-3">
-        <label class="form-label">Attach Images</label>
-        <input type="file" class="form-control" name="images[]" multiple accept="image/*">
-        <small class="text-muted">You can attach multiple images.</small>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Publish At (MYT)</label>
-        <input type="datetime-local" class="form-control" name="publish_at">
-        <small class="text-muted">Leave empty to publish immediately.</small>
+      <label class="form-label">Publish At (UTC)</label>
+      <input type="datetime-local" class="form-control" name="publish_at">
+      <small class="text-muted">Leave empty to publish immediately.</small>
     </div>
 
     <div class="form-check mb-3">
-        <input type="checkbox" class="form-check-input" name="draft" id="draft">
-        <label for="draft" class="form-check-label">Save as Draft</label>
+      <input type="checkbox" class="form-check-input" name="draft" id="draft">
+      <label for="draft" class="form-check-label">Save as Draft</label>
     </div>
 
     <button type="submit" class="btn btn-primary w-100">🚀 Create Post</button>
-</form>
+  </form>
 
-<?php if ($responseMessage): ?>
-    <div class="mt-4"><?= $responseMessage ?></div>
-<?php endif; ?>
+  <?php if ($responseMessage): ?>
+    <div class="mt-4">
+      <h5>Response</h5>
+      <?= $responseMessage ?>
+    </div>
+  <?php endif; ?>
 
-<footer>
+  <footer>
     <a href="dashboard.php">← Back to Dashboard</a>
-</footer>
+  </footer>
 </div>
 </body>
 </html>
