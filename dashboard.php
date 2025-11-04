@@ -273,7 +273,7 @@ pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
 
             // Append the account **twice**
             accountsDiv.appendChild(createAccountDiv(acc));
-            accountsDiv.appendChild(createAccountDiv(acc));
+            //accountsDiv.appendChild(createAccountDiv(acc));
         });
     }
 

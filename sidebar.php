@@ -265,7 +265,7 @@
 			<a class="navbar-brand" href="admin-list.php">Sync <b>Share</b></a>
 			<ul class="nav nav-pills flex-column mb-auto">
 				<li class="nav-item">
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'posts-list.php'): ?> active <?php endif; ?>" href="posts.php">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-all.php'): ?> active <?php endif; ?>" href="post_all.php">
 						<i class="fas fa-user-shield me-2"></i> Posts
 					</a>
 				</li>

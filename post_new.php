@@ -1,24 +1,107 @@
 <?php
 session_start();
 
-// 🔐 Redirect to login if token not found
-if (!isset($_SESSION['token'])) {
-    header("Location: login.php");
-    exit;
-}
-
+// ===========================
+// 1️⃣ Check API token
+// ===========================
+if (empty($_SESSION['token'])) die("❌ No API token found in session.");
 $token = $_SESSION['token'];
 $responseMessage = "";
 
-echo "✅ Token in session: " . substr($token, 0, 20) . "...<br><br>";
+// ===========================
+// 🔹 Function: Upload Media
+// ===========================
+function uploadMediaToSocialBu($filePath, $token) {
+    if (!file_exists($filePath)) return ["error" => "File not found: $filePath"];
 
-// =========================
+    $fileName = basename($filePath);
+    $mimeType = mime_content_type($filePath);
+
+    // Step 1: Request signed URL
+    $payload = json_encode(["name" => $fileName, "mime_type" => $mimeType]);
+    $ch = curl_init("https://socialbu.com/api/v1/upload_media");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            "Authorization: Bearer $token",
+            "Content-Type: application/json"
+        ],
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200) return ["error" => "Failed to get signed URL. HTTP $httpCode: $resp"];
+
+    $data = json_decode($resp, true);
+    if (empty($data['signed_url']) || empty($data['key'])) return ["error" => "Invalid response: $resp"];
+
+    $signedUrl = $data['signed_url'];
+    $key = $data['key'];
+
+    // Step 2: Upload file via PUT
+    $parsed = parse_url($signedUrl);
+    parse_str($parsed['query'] ?? '', $query);
+    $signedHeaders = explode(';', $query['X-Amz-SignedHeaders'] ?? '');
+    $headersToSend = ["Content-Type: $mimeType", "Expect:"];
+    foreach ($signedHeaders as $h) {
+        if ($h === 'x-amz-acl') $headersToSend[] = "x-amz-acl: private";
+    }
+
+    $fp = fopen($filePath, 'rb');
+    $ch = curl_init($signedUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_PUT => true,
+        CURLOPT_INFILE => $fp,
+        CURLOPT_INFILESIZE => filesize($filePath),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headersToSend,
+        CURLOPT_VERBOSE => true
+    ]);
+    $uploadResp = curl_exec($ch);
+    $info = curl_getinfo($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+    fclose($fp);
+
+    if (!in_array($info['http_code'], [200, 201])) {
+        return ["error" => "Upload failed. HTTP {$info['http_code']}. cURL error: $error", "response" => $uploadResp];
+    }
+
+    // Step 3: Verify upload status
+    $attempts = 0;
+    $uploadToken = null;
+    while ($attempts < 5 && !$uploadToken) {
+        $ch = curl_init("https://socialbu.com/api/v1/upload_media/status?key=" . urlencode($key));
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ["Authorization: Bearer $token"]
+        ]);
+        $statusResp = curl_exec($ch);
+        curl_close($ch);
+
+        $statusData = json_decode($statusResp, true);
+        if (!empty($statusData['upload_token'])) {
+            $uploadToken = $statusData['upload_token'];
+            break;
+        }
+        $attempts++;
+        sleep(2);
+    }
+
+    if (!$uploadToken) return ["error" => "Upload verification failed", "response" => $statusResp];
+
+    return ["success" => true, "upload_token" => $uploadToken];
+}
+
+// ===========================
 // 🔹 Step 1: Fetch Accounts
-// =========================
+// ===========================
 $ch = curl_init('https://socialbu.com/api/v1/accounts');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_FOLLOWLOCATION => false, // prevent 302 redirect masking
     CURLOPT_HTTPHEADER => [
         'Authorization: Bearer ' . $token,
         'Accept: application/json'
@@ -28,16 +111,14 @@ $response = curl_exec($ch);
 $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-if ($httpcode === 200) {
-    $accounts = json_decode($response, true);
-} else {
-    $accounts = [];
-    $responseMessage = "<pre style='background:#ffe6e6;padding:10px;border-radius:8px;'>❌ Failed to fetch accounts. HTTP $httpcode\n$response</pre>";
+$accounts = ($httpcode === 200) ? json_decode($response, true) : [];
+if ($httpcode !== 200) {
+    $responseMessage .= "<pre style='background:#ffe6e6;padding:10px;border-radius:8px;'>❌ Failed to fetch accounts. HTTP $httpcode\n$response</pre>";
 }
 
-// ==================================
+// ===========================
 // 🔹 Step 2: Handle Post Submission
-// ==================================
+// ===========================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accounts_selected = isset($_POST['accounts']) ? array_map('intval', $_POST['accounts']) : [];
     $content = trim($_POST['content'] ?? '');
@@ -45,43 +126,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $draft = isset($_POST['draft']);
 
     if (empty($accounts_selected)) {
-        $responseMessage = "<div class='alert alert-warning'>⚠️ Please select at least one account.</div>";
+        $responseMessage .= "<div class='alert alert-warning'>⚠️ Please select at least one account.</div>";
     } elseif (empty($content)) {
-        $responseMessage = "<div class='alert alert-warning'>⚠️ Post content cannot be empty.</div>";
+        $responseMessage .= "<div class='alert alert-warning'>⚠️ Post content cannot be empty.</div>";
     } else {
-        // ✅ Convert local Malaysia time to UTC before sending to API
+        // Convert Malaysia time to UTC
         if (!empty($publish_at_input)) {
             try {
                 $local = new DateTime($publish_at_input, new DateTimeZone('Asia/Kuala_Lumpur'));
                 $local->setTimezone(new DateTimeZone('UTC'));
                 $publish_at = $local->format('Y-m-d H:i:s');
             } catch (Exception $e) {
-                $publish_at = gmdate("Y-m-d H:i:s"); // fallback to current UTC
+                $publish_at = gmdate("Y-m-d H:i:s");
             }
         } else {
             $publish_at = gmdate("Y-m-d H:i:s");
         }
 
+        // Upload Media
+        $upload_tokens = [];
+        if (!empty($_FILES['media']['tmp_name'][0])) {
+            foreach ($_FILES['media']['tmp_name'] as $i => $tmpFile) {
+                $result = uploadMediaToSocialBu($tmpFile, $token);
+                if (!empty($result['success'])) {
+                    $upload_tokens[] = $result['upload_token'];
+                } else {
+                    $responseMessage .= "<div class='alert alert-danger'>❌ Media upload failed: " 
+                        . htmlspecialchars($result['error'] ?? 'Unknown error') 
+                        . "</div>";
+                    if (!empty($result['response'])) {
+                        $responseMessage .= "<pre>" . htmlspecialchars($result['response']) . "</pre>";
+                    }
+                }
+            }
+        }
 
-        // ✅ Use integer 0 for team_id
+        // Create Post
+        $attachments = array_map(fn($t) => ["upload_token" => $t], $upload_tokens);
+
         $payload = [
             "accounts" => $accounts_selected,
             "publish_at" => $publish_at,
             "content" => $content,
             "draft" => $draft,
-            "existing_attachments" => [],
+            "existing_attachments" => $attachments, // wrap each token
             "options" => new stdClass(),
             "postback_url" => "",
             "queue_ids" => [],
             "team_id" => 0
         ];
 
-        $json_payload = json_encode($payload, JSON_PRETTY_PRINT);
 
+        $json_payload = json_encode($payload, JSON_PRETTY_PRINT);
         $ch = curl_init("https://socialbu.com/api/v1/posts");
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $token,
                 'Accept: application/json',
@@ -95,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $curl_error = curl_error($ch);
         curl_close($ch);
 
-        $responseMessage = "<h6>🔍 Debug Info</h6>"
+        $responseMessage .= "<h6>🔍 Debug Info</h6>"
             . "<pre style='background:#eef;padding:10px;border-radius:8px;'>Payload:\n"
             . htmlspecialchars($json_payload)
             . "\n\nHTTP $httpcode Response:\n"
@@ -105,8 +204,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             . "</pre>";
     }
 }
-
-
 ?>
 
 <!DOCTYPE html>
@@ -133,7 +230,7 @@ footer { text-align: center; margin-top: 25px; color: #888; }
 <div class="container">
   <h1>📝 Create a New Post</h1>
 
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
     <div class="mb-3">
       <label class="form-label">Select Accounts</label>
       <div class="account-list">
@@ -157,7 +254,13 @@ footer { text-align: center; margin-top: 25px; color: #888; }
     </div>
 
     <div class="mb-3">
-      <label class="form-label">Publish At (UTC)</label>
+      <label class="form-label">Attach Images</label>
+      <input type="file" class="form-control" name="media[]" multiple accept="image/*">
+      <small class="text-muted">You can select multiple images.</small>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Publish At (Malaysia Time)</label>
       <input type="datetime-local" class="form-control" name="publish_at">
       <small class="text-muted">Leave empty to publish immediately.</small>
     </div>

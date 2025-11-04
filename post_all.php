@@ -102,10 +102,23 @@ body { background: #f5f6fa; font-family: "Segoe UI", sans-serif; }
       }
     ?>
       <div class="post-card">
-        <div class="post-header">
-          <strong><?= $content ?></strong>
-          <span class="status <?= $statusClass ?>"><?= $statusLabel ?></span>
-        </div>
+    <div class="post-header">
+        <strong><?= $content ?></strong>
+        <span class="status <?= $statusClass ?>"><?= $statusLabel ?></span>
+    </div>
+        <!-- Post Images -->
+        <?php if (!empty($post['attachments'])): ?>
+            <div class="d-flex flex-wrap gap-2 my-2">
+                <?php foreach ($post['attachments'] as $att): ?>
+                    <?php if (!empty($att['url'])): ?>
+                        <a href="<?= htmlspecialchars($att['url']) ?>" target="_blank">
+                            <img src="<?= htmlspecialchars($att['url']) ?>" 
+                                style="max-width:120px; max-height:120px; object-fit:cover; border-radius:6px; border:1px solid #ddd;">
+                        </a>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
 
         <small class="small-muted">🆔 Post ID: <b><?= $postId ?></b></small>
         <small class="small-muted">📤 Account: <b><?= $accountId ?></b> — <?= $accountType ?></small>
@@ -113,9 +126,9 @@ body { background: #f5f6fa; font-family: "Segoe UI", sans-serif; }
         <small class="small-muted">📅 Created at (MYT): <b><?= $createdAt ?></b></small>
 
         <div style="margin-top:10px;">
-          <a href="post_view.php?id=<?= urlencode($postId) ?>" class="btn btn-sm btn-outline-secondary">🔍 View Details</a>
+            <a href="post_view.php?id=<?= urlencode($postId) ?>" class="btn btn-sm btn-outline-secondary">🔍 View Details</a>
         </div>
-      </div>
+    </div>
     <?php endforeach; ?>
   <?php else: ?>
     <p class="text-muted">No posts found.</p>
