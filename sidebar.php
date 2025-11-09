@@ -69,7 +69,7 @@
 		border-radius: 10px;
 		border: 0;
 		padding: 0 1.2rem;
-		background: linear-gradient(to right, #8914fe 0%, #8063f5 100%);
+		background: linear-gradient(to right, #04a3ce 0%, #04a3ce 100%);
 		box-shadow: 0px 25px 10px -10px rgba(0, 0, 0, 0.08);
 	}
 
@@ -79,53 +79,77 @@
 
 	.btn-primary {
 		color: #fff;
-		background: linear-gradient(to right, #8914fe 0%, #8063f5 100%) !important;
-		border-color: #6F42C2 !important;
+		background: linear-gradient(to right, #04a3ce 0%, #04a3ce 100%) !important;
+		border-color: #04a3ce !important;
 	}
 
 	.btn-primary:hover {
 		color: #fff;
-		background-color: #906BD4 !important;
-		border-color: #906BD4 !important;
+		background-color: #04a3ce !important;
+		border-color: #04a3ce !important;
 		-webkit-box-shadow: none;
 		box-shadow: none;
 	}
 
 	.btn-primary:focus {
-		box-shadow: 0 0 0 0.2rem rgba(111, 66, 194, .5) !important;
+		box-shadow: 0 0 0 0.2rem #04a3ce !important;
 	}
-	.sidebar{
-		background-color: #352f39 !important;
-		width: 250px;
+	.sidebar {
+		background-color: #2f3039 !important;
+		width: 300px;
+		position: sticky;  /* make it sticky */
+		top: 0;            /* stick to the top when scrolling */
+		height: 100vh;     /* full viewport height */
+		overflow-y: auto;  /* allow scrolling inside sidebar if content exceeds height */
 	}
 	.navbar-brand{
-		font-size: 27px;
+		font-size: 35px;
 		color: white !important;
 		text-align: center;
 		margin: 0 !important;
+        font-family: 'Poppins', sans-serif;
 		padding-bottom: 17px;
 	}
+	.nav-link{
+		font-size: 17px;
+	}
+	.nav-link i{
+		margin-left: 20px;
+	}
 	.nav-link.active{
-		background-color: #974fde !important;
+		background-color: #04a3ce !important;
 		transition: 0.15s;
 	}
 	.nav-link.active:hover{
-		background-color:rgb(130, 60, 199) !important;
+		background-color: #1b78aeff !important;
 	}
 	.nav-pills li, .nav-pills li a{
 		width: 100%;
 		margin: 0px !important;
-		color: white;
+		color: white !important;
 	}
 	.nav-pills li a{
 		padding-top: 15px;
 		padding-bottom: 15px;
 	}
+	.nav-pills li a:focus,
+	.nav-pills li a:active,
+	.nav-pills li a:focus-visible {
+		outline: none !important;
+		box-shadow: none !important;
+		background: none !important; /* optional – prevents active highlight */
+	}
+
 	.nav-pills .nav-link.active{
 		border-radius: 0px !important;
 	}
 	.nav-link.active{
-		background-color: #974fde !important;
+		background-color: #04a3ce !important;
+		font-weight: bold;
+	}
+	.nav-link:hover{
+		background-color: #454555ff !important;
+		color: white;
 	}
 	table, th, tr, td{
 		border: none !important;
@@ -159,7 +183,7 @@
 	}
 
 	button{
-		background-color: #974fde !important;
+		background-color: #04a3ce !important;
 		transition: 0.15s;
 		border: none;
 		border-radius: 8px;
@@ -169,7 +193,7 @@
 		font-weight: bold;
 	}
 	button:hover{
-		background-color:rgb(130, 60, 199) !important;
+		background-color:#04a3ce !important;
 		transform: scale(1.05);
 		outline: none;
 	}
@@ -183,7 +207,7 @@
 	}
 	td i:hover{
 		padding-right: 10px;
-		color: #974fde;
+		color: #04a3ce;
 		transform: scale(1.2);
 	}
 	.success-alert{
@@ -237,7 +261,7 @@
 		padding: 0.5em 1em;
 		font-size: 1rem;
 		border: 0px;
-		background-color: #6F42C2 !important;
+		background-color: #04a3ce !important;
 		color: white;
 		border-radius: 4px;
 		margin: 0px;
@@ -256,32 +280,32 @@
 		cursor: pointer;
 	}
 	.back-button:hover{
-		color: #974fde !important;
+		color: #04a3ce !important;
 		transform: scale(1.02);
 	}
 </style>
 	<nav class="navbar navbar-light bg-light flex-column vh-100 sidebar">
 		<div class="flex-column" style="width: 100%; display: flex;">
-			<a class="navbar-brand" href="admin-list.php">Sync <b>Share</b></a>
+			<a class="navbar-brand" href="dashboard.php">Sync<b>Share</b></a>
 			<ul class="nav nav-pills flex-column mb-auto">
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'dashboard.php'): ?> active <?php endif; ?>" href="dashboard.php">
+						<i class="fas fa-user-shield me-2"></i> Dashboard
+					</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'account-all.php'): ?> active <?php endif; ?>" href="account-all.php">
+						<i class="fas fa-users me-2"></i> Accounts
+					</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-all.php' || 'post-new.php' || 'post-view.php'): ?> active <?php endif; ?>" href="post-all.php">
+						<i class="fas fa-mail-bulk me-2"></i> Posts
+					</a>
+				</li>
 				<li class="nav-item">
 					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-all.php'): ?> active <?php endif; ?>" href="post_all.php">
 						<i class="fas fa-user-shield me-2"></i> Posts
-					</a>
-				</li>
-				<li>
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'doctor-list.php'): ?> active <?php endif; ?>" href="doctor-list.php">
-						<i class="fas fa-user-md me-2"></i> Doctor List
-					</a>
-				</li>
-				<li>
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'patient-list.php'): ?> active <?php endif; ?>" href="patient-list.php">
-						<i class="fas fa-users me-2"></i> Patient List
-					</a>
-				</li>
-				<li>
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'admin-schedule.php'): ?> active <?php endif; ?>" href="admin-schedule.php">
-						<i class="fas fa-calendar-check me-2"></i> Appointments
 					</a>
 				</li>
 			</ul>

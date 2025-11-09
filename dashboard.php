@@ -105,7 +105,11 @@ body {
     color: #333;
     margin: 0;
 }
-h1 { margin-bottom: 15px; }
+h1 {
+    font-size: 30px;
+    font-weight: bold;
+    margin-bottom: 0px;
+}
 .dashboard {
     
 }
@@ -124,13 +128,25 @@ button {
     cursor: pointer;
 }
 button:hover { background: #0056b3; }
-pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
+pre { background: #04a3ce; color: white; padding: 0px; border-radius: 0px; margin: 0px;}
 #accounts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* auto-fit ensures even distribution */
-  gap: 20px; /* gap between cards */
-  margin-top: 20px;
+  grid-template-columns: repeat(3, 1fr); /* exactly 3 per row */
+  gap: 20px;
 }
+
+@media (max-width: 1024px) {
+  #accounts {
+    grid-template-columns: repeat(2, 1fr); /* 2 per row on smaller screens */
+  }
+}
+
+@media (max-width: 768px) {
+  #accounts {
+    grid-template-columns: 1fr; /* 1 per row on mobile */
+  }
+}
+
 
 .account {
   background: #fff;
@@ -139,6 +155,17 @@ pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
   padding: 15px;
   box-shadow: 0 3px 6px rgba(0,0,0,0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+}
+
+.account img{
+    width: 60px;
+    height: 60px;
+}
+
+.actions{
+    flex-direction: column;
 }
 
 .actions button {
@@ -146,6 +173,7 @@ pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
     width: auto;
     margin-right: 5px;
     background: #28a745;
+    transition: transform 0.15s ease-in-out;
 }
 .actions button.delete { background: #dc3545; }
 .actions button.update { background: #ffc107; color: #000; }
@@ -155,6 +183,17 @@ pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     margin-bottom: 20px;
+    color: #888;
+}
+
+.actions i:hover {
+    transform: scale(1.1);
+    color:#04a3ce;
+    cursor: pointer;
+}
+
+.container{
+    padding: 0px 1.5rem!important
 }
 </style>
 </head>
@@ -165,10 +204,10 @@ pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
                 include 'sidebar.php';
             ?>
             <div style="width:100%;">
-                <div>
+                <pre id="output"></pre>
+                <div class="py-4 px-4">
                     <h1>Dashboard</h1>
                 </div>
-                <pre id="output"></pre>
                 <div class="d-flex">
   <div class="dashboard container container-fluid" id="dashboard">
     <div class="ui-container">
@@ -257,23 +296,20 @@ pre { background: #1e1e1e; color: #00ff9c; padding: 10px; border-radius: 5px; }
                         <div>
                             <strong>${acc.name || "(Unnamed Account)"}</strong><br>
                             <small>${acc._type || acc.type || "Unknown Platform"}</small><br>
-                            <small>Status: ${acc.active ? "🟢 Active" : "🔴 Inactive"}</small>
+                            <small>Status: ${acc.active ? '<i class="fas fa-link" style="color:green;"></i> Linked' : '<i class="fas fa-unlink" style="color:red;"></i> Unlinked'}</small>
+
                         </div>
                     </div>
-                    <div class="actions" style="margin-top:10px;">
-                        <button class="update" onclick="renameAccount(${acc.id})">Rename</button>
-                        <button class="delete" onclick="deleteAccount(${acc.id})">Delete</button>
+                    <div class="actions" style="margin-top:6px; display:flex; gap:10px; font-size:18px;">
+                        <i class="fas fa-edit update" cursor:pointer;" title="Rename" onclick="renameAccount(${acc.id})"></i>
+                        <i class="fas fa-trash delete" cursor:pointer;" title="Delete" onclick="deleteAccount(${acc.id})"></i>
                     </div>
-                    <pre style="background:#f9f9f9; color:#333; padding:10px; border-radius:5px; overflow-x:auto;">
-    ${JSON.stringify(acc, null, 2)}
-                    </pre>
                 `;
                 return div;
             };
 
             // Append the account **twice**
             accountsDiv.appendChild(createAccountDiv(acc));
-            //accountsDiv.appendChild(createAccountDiv(acc));
         });
     }
 
@@ -304,13 +340,13 @@ async function connectProvider(provider) {
   const res = await api('add', { provider });
 
   if (res.connect_url) {
-    out.textContent = `✅ Got connect URL for ${provider}. Opening popup...`;
+    out.textContent = `Got connect URL for ${provider}. Opening popup...`;
     window.open(res.connect_url, "_blank", "width=600,height=700");
     const modal = bootstrap.Modal.getInstance(document.getElementById('addAccountModal'));
     modal.hide(); // Close modal
     setTimeout(loadAccounts, 10000);
   } else {
-    out.textContent = `❌ Failed to get connect URL:\n${JSON.stringify(res, null, 2)}`;
+    out.textContent = `Failed to get connect URL:\n${JSON.stringify(res, null, 2)}`;
   }
 }
 
