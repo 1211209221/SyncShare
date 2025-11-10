@@ -121,17 +121,7 @@ if ($httpcode !== 200) {
 // ===========================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accounts_selected = isset($_POST['accounts']) ? array_map('intval', $_POST['accounts']) : [];
-    // Inside your POST handling section
     $content = trim($_POST['content'] ?? '');
-
-    // ✅ Use AI output if available
-    if (!empty($_POST['ai_output'])) {
-        $aiOutputText = trim($_POST['ai_output']);
-        if (!empty($aiOutputText)) {
-            $content = $aiOutputText; // Override original content
-        }
-    }
-
     $publish_at_input = trim($_POST['publish_at'] ?? '');
     $draft = isset($_POST['draft']);
 
@@ -215,6 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -233,10 +224,6 @@ body { background: #f5f6fa; font-family: "Segoe UI", sans-serif; }
 .account-item img { width: 32px; height: 32px; border-radius: 50%; }
 h1 { text-align: center; margin-bottom: 25px; }
 footer { text-align: center; margin-top: 25px; color: #888; }
-#aiOutput{
-      height: 250px;
-
-}
 </style>
 </head>
 <body>
@@ -263,31 +250,8 @@ footer { text-align: center; margin-top: 25px; color: #888; }
 
     <div class="mb-3">
       <label class="form-label">Post Content</label>
-      <textarea class="form-control" id="postContent" name="content" rows="4" placeholder="Write your post here..." required></textarea>
+      <textarea class="form-control" name="content" rows="4" placeholder="Write your post here..." required></textarea>
     </div>
-<div class="mb-3">
-  <label class="form-label">AI Text Assistant</label>
-  <div class="input-group mb-2">
-    <input type="text" id="aiInstruction" class="form-control" placeholder="e.g., Make this sound more friendly">
-    <button type="button" id="applyAI" class="btn btn-outline-secondary">✨ Apply AI</button>
-  </div>
-  <small class="text-muted">Enter your instruction or choose one of the style options below.</small>
-
-  <!-- ✅ Style Options -->
-  <div class="mt-2 d-flex flex-wrap gap-2">
-    <label><input type="checkbox" class="ai-option" value="short"> Short</label>
-    <label><input type="checkbox" class="ai-option" value="medium"> Medium</label>
-    <label><input type="checkbox" class="ai-option" value="detailed"> Detailed</label>
-    <label><input type="checkbox" class="ai-option" value="hashtags"> Hashtags</label>
-    <label><input type="checkbox" class="ai-option" value="professional"> Professional</label>
-    <label><input type="checkbox" class="ai-option" value="trendy"> Trendy</label>
-    <label><input type="checkbox" class="ai-option" value="emojis"> Emojis</label>
-  </div>
-
-  <!-- ✅ Separate AI output -->
-  <textarea class="form-control mt-3" id="aiOutput" name="ai_output" rows="4" placeholder="AI rewrite will appear here..."></textarea>
-  <div id="aiMessage" class="mt-2"></div>
-</div>
 
     <div class="mb-3">
       <label class="form-label">Attach Images</label>
@@ -321,136 +285,4 @@ footer { text-align: center; margin-top: 25px; color: #888; }
   </footer>
 </div>
 </body>
-<script>
-document.getElementById('applyAI').addEventListener('click', async () => {
-  const content = document.getElementById('postContent').value.trim();
-  const instruction = document.getElementById('aiInstruction').value.trim();
-  const options = Array.from(document.querySelectorAll('.ai-option:checked')).map(cb => cb.value);
-  const messageBox = document.getElementById('aiMessage');
-  const aiOutput = document.getElementById('aiOutput');
-  const button = document.getElementById('applyAI');
-
-  messageBox.innerHTML = '';
-  aiOutput.value = '';
-
-  if (!content && !instruction && options.length === 0) {
-    messageBox.innerHTML = `<div class="text-danger mt-1">⚠️ Please enter content or select an AI option.</div>`;
-    return;
-  }
-
-  button.disabled = true;
-  button.textContent = "⏳ Processing...";
-
-  try {
-    // --------------------------
-    // Construct AI instruction with style
-    // --------------------------
-    let charInstruction = '';
-    let minLength = 0, maxLength = 0;
-    let styleInstructions = [];
-
-    options.forEach(opt => {
-      switch (opt) {
-        case 'short': charInstruction = 'Rewrite this text to be within 70–100 characters'; minLength = 70; maxLength = 100; break;
-        case 'medium': charInstruction = 'Rewrite this text to be within 200–250 characters'; minLength = 200; maxLength = 250; break;
-        case 'detailed': charInstruction = 'Rewrite this text to be within 450–500 characters'; minLength = 450; maxLength = 500; break;
-        case 'hashtags': styleInstructions.push('add relevant hashtags at the end'); break;
-        case 'professional': styleInstructions.push('use a professional and polished tone'); break;
-        case 'trendy': styleInstructions.push('use Gen Z slang'); break;
-        case 'emojis': styleInstructions.push('include suitable emojis naturally'); break;
-      }
-    });
-
-    let fullInstruction = '';
-    if (charInstruction) fullInstruction += charInstruction + '.';
-    if (instruction) fullInstruction += (fullInstruction ? ' ' : '') + instruction + '.';
-    if (styleInstructions.length) fullInstruction += ' ' + styleInstructions.join(', ') + '.';
-    fullInstruction += ' Keep it clear, readable, and within the specified character range.';
-
-    // --------------------------
-    // Debug: Show full prompt on page
-    // --------------------------
-    const debugContainer = document.getElementById('aiPromptDebug');
-    if (debugContainer) debugContainer.innerText = fullInstruction;
-
-    // --------------------------
-    // Send request to AI
-    // --------------------------
-    const res = await fetch('ai_rewrite.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ content, instruction: fullInstruction })
-    });
-
-    const data = await res.json();
-
-    // --------------------------
-    // Determine selected accounts and max character limit
-    // --------------------------
-    const selectedCheckboxes = document.querySelectorAll('input[name="accounts[]"]:checked');
-    let twitterSelected = false;
-    let mastodonSelected = false;
-
-    selectedCheckboxes.forEach(cb => {
-      const labelText = cb.closest('.account-item')?.innerText.toLowerCase() || '';
-      if (labelText.includes('twitter')) twitterSelected = true;
-      if (labelText.includes('mastodon')) mastodonSelected = true;
-    });
-
-    let enforceCharLimit = false;
-    let charLimit = 0;
-    if (twitterSelected && mastodonSelected) {
-      enforceCharLimit = true;
-      charLimit = 280; // lower limit
-    } else if (twitterSelected) {
-      enforceCharLimit = true;
-      charLimit = 280;
-    } else if (mastodonSelected) {
-      enforceCharLimit = true;
-      charLimit = 500;
-    }
-
-    // --------------------------
-    // Handle AI response and show warnings
-    // --------------------------
-    if (data.modified) {
-      let outputText = data.modified;
-      aiOutput.value = outputText;
-
-      if (enforceCharLimit) {
-        if (outputText.length > charLimit) {
-          messageBox.innerHTML = `<div class="text-warning mt-1">⚠️ AI output exceeds ${charLimit} characters (${outputText.length}).</div>`;
-        } else {
-          messageBox.innerHTML = `<div class="text-success mt-1">✅ AI output is within the character limit (${outputText.length}/${charLimit}) for selected platform(s).</div>`;
-        }
-      } else {
-        messageBox.innerHTML = `<div class="text-success mt-1">✅ AI rewrite generated successfully (${outputText.length} characters).</div>`;
-      }
-
-    } else {
-      messageBox.innerHTML = `<div class="text-danger mt-1">❌ AI failed: ${data.error || 'Unknown error'}</div>`;
-    }
-
-  } catch (err) {
-    messageBox.innerHTML = `<div class="text-danger mt-1">❌ Error connecting to AI: ${err.message}</div>`;
-  }
-
-  button.disabled = false;
-  button.textContent = "✨ Apply AI";
-
-
-  const form = document.querySelector('form');
-    form.addEventListener('submit', () => {
-        const aiOutput = document.getElementById('aiOutput').value.trim();
-        if (aiOutput) {
-            // Override the original content with AI output
-            document.getElementById('postContent').value = aiOutput;
-        }
-    });
-    });
-</script>
-
-<!-- Debug container somewhere below the AI input -->
-<pre id="aiPromptDebug" style="background:#eef;padding:10px;border-radius:8px;margin-top:10px;"></pre>
-
 </html>

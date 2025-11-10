@@ -1,0 +1,12 @@
+[2025-11-10 20:49:26] Sending request: {"model":"kimi-k2-turbo-preview","messages":[{"role":"system","content":"You are Kimi, an AI assistant. Provide safe and helpful answers."},{"role":"user","content":"Create your dream designs using Printcious! Badges, Enamel Charms and etc all ready for you to customize!"}],"temperature":0.6,"max_tokens":150}
+[2025-11-10 20:49:27] HTTP Code: 429
+[2025-11-10 20:49:27] Response: {"error":{"message":"Your account org-089e04559f0f484883ff1c7b853ccceb \u003cak-f6b65f11xfdi11eie9b1\u003e is suspended, please check your plan and billing details","type":"exceeded_current_quota_error"}}
+[2025-11-10 20:49:27] Moonshot API request failed (HTTP 429)
+[2025-11-10 20:49:38] Sending request: {"model":"kimi-k2-turbo-preview","messages":[{"role":"system","content":"You are Kimi, an AI assistant. Provide safe and helpful answers."},{"role":"user","content":"Create your dream designs using Printcious! Badges, Enamel Charms and etc all ready for you to customize!"}],"temperature":0.6,"max_tokens":150}
+[2025-11-10 20:49:39] HTTP Code: 429
+[2025-11-10 20:49:39] Response: {"error":{"message":"Your account org-089e04559f0f484883ff1c7b853ccceb \u003cak-f6b65f11xfdi11eie9b1\u003e is suspended, please check your plan and billing details","type":"exceeded_current_quota_error"}}
+[2025-11-10 20:49:39] Moonshot API request failed (HTTP 429)
+[2025-11-10 20:50:11] Sending request: {"model":"kimi-k2-turbo-preview","messages":[{"role":"system","content":"You are Kimi, an AI assistant. Provide safe and helpful answers."},{"role":"user","content":"Create your dream designs using Printcious! Badges, Enamel Charms and etc all ready for you to customize!"}],"temperature":0.6,"max_tokens":150}
+[2025-11-10 20:50:12] HTTP Code: 429
+[2025-11-10 20:50:12] Response: {"error":{"message":"Your account org-f7522b0bde024d4d9dcbf42a678e393a \u003cak-f6b53n11xfdi11eie891\u003e is suspended, please check your plan and billing details","type":"exceeded_current_quota_error"}}
+[2025-11-10 20:50:12] Moonshot API request failed (HTTP 429)
