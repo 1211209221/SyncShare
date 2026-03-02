@@ -8,6 +8,34 @@ if (!isset($_SESSION['token'])) {
 
 $token = $_SESSION['token'];
 
+$accountImageMap = [];
+$accountNameMap  = [];
+
+if (isset($_SESSION['token'])) {
+    $ch = curl_init('https://socialbu.com/api/v1/accounts');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $_SESSION['token'],
+            'Content-Type: application/json'
+        ]
+    ]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $accounts = json_decode($response, true);
+
+    if (json_last_error() === JSON_ERROR_NONE) {
+        // Example: print each account's name and profile picture
+        foreach ($accounts as $acc) {
+            $id = $acc['id'] ?? $acc['account_id']; // use whichever exists
+            $accountImageMap[$id] = $acc['image'] ?? 'assets/default-avatar.png';
+            $accountNameMap[$id]  = $acc['name'] ?? 'Unknown Account';
+        }
+    }
+}
+
+
 // Fetch helper
 function fetchPosts($token, $type = 'scheduled') {
     $url = "https://socialbu.com/api/v1/posts?type=$type";
@@ -61,22 +89,23 @@ function getAccountName($token, $accountId) {
     return $accountsCache[$accountId];
 }
 
-// Convert UTC → Malaysia time (12-hour format)
+// Convert UTC → Malaysia time (format: Jan 1, 10:21AM)
 function utcToMalaysia($utcTime) {
     if (empty($utcTime)) return 'Unknown';
     try {
         $dt = new DateTime($utcTime, new DateTimeZone('UTC'));
         $dt->setTimezone(new DateTimeZone('Asia/Kuala_Lumpur'));
-        return $dt->format('Y-m-d g:i A');
+        return $dt->format('Y M j · g:i A');  // Example: Jan 1, 10:21AM
     } catch (Exception $e) {
         return $utcTime;
     }
 }
 
 // Fetch posts
+$draftPosts = fetchPosts($token, 'draft');
 $scheduledPosts = fetchPosts($token, 'scheduled');
 $publishedPosts = fetchPosts($token, 'published');
-$posts = array_merge($scheduledPosts, $publishedPosts);
+$posts = array_merge($draftPosts, $scheduledPosts, $publishedPosts);
 usort($posts, function($a, $b) {
     $pa = !empty($a['publish_at']) ? strtotime($a['publish_at']) : 0;
     $pb = !empty($b['publish_at']) ? strtotime($b['publish_at']) : 0;
@@ -95,14 +124,53 @@ usort($posts, function($a, $b) {
 <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <style>
-body { background: #f5f6fa; font-family: "Segoe UI", sans-serif; }
-.post-card {border-radius: 8px; padding: 15px; background: #f3f4f6; }
-.post-header { display: flex; justify-content: space-between; align-items: center; }
-.status { font-size: 0.9em; }
-.status.published { color: green; }
-.status.scheduled { color: #f0ad4e; }
-.status.draft { color: #888; }
-.small-muted { color: #666; display:block; margin-top:6px; }
+body {
+    background: #f5f6fa;
+    font-family: "Segoe UI", sans-serif;
+}
+
+.post-card {
+    border-radius: 8px;
+    padding: 15px;
+    background: #f3f4f6;
+    transition: 0.2s;
+}
+
+.post-card:hover{
+    transform: scale(1.02);
+    background-color: #e2e1e7;
+    cursor: pointer;
+    color: #53515f;
+
+}
+
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.status {
+    font-size: 0.9em;
+}
+
+.status.published {
+    color: green;
+}
+
+.status.scheduled {
+    color: #f0ad4e;
+}
+
+.status.draft {
+    color: #9a97a7;
+}
+
+.small-muted {
+    display:block;
+    margin-top:6px;
+}
+
 h1 {
     font-size: 30px;
     font-weight: bold;
@@ -132,7 +200,7 @@ h1 {
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
-    color: #888;
+    color: #9a97a7;
 }
 
 .actions i:hover{
@@ -177,7 +245,7 @@ input, select, button, span{
 
 #accountSearch, #accountFilter, #accountSearch::placeholder{
     font-size: 17px;
-    color: #888;
+    color: #9a97a7;
     margin: 0;
 }
 
@@ -240,8 +308,53 @@ button.add-account:hover {
   grid-template-columns: repeat(auto-fill, minmax(48%, 1fr));
   gap: 15px;
 }
+.post-images {
+    width: 250px;
+    height: 250px;
+    display: grid;
+    gap: 6px;
+    overflow: hidden;
+}
 
+.post-images div{
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #f3f4f6;
+}
 
+.post-images.single {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+.post-images.single div {
+    width: 100%;
+    height: 100%;
+}
+
+.post-images.multiple {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.post-images.multiple div {
+    aspect-ratio: 1 / 1;  /* 🔥 forces square cells */
+}
+
+.post-images div {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.post-images img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;        /* 🔥 crops instead of stretching */
+    object-position: center;  /* center the crop */
+    border-radius: 6px;
+    border: 1px solid #f3f4f6;
+    background: white;
+}
 </style>
 </head>
 <body>
@@ -249,12 +362,12 @@ button.add-account:hover {
     <div class="d-flex">
         <?php include 'sidebar.php'; ?>
         <div style="width:100%;">
-            <div class="py-4 px-4"><h1>Posts List</h1></div>
+            <div class="py-3 px-3" style="background-color: white; margin-bottom: 20px;"><h1>Posts List</h1></div>
             <div class="d-flex">
                 <div class="dashboard container container-fluid" id="dashboard">
                     <div class="d-flex gap-2 mb-3">
                         <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search" style="color: #888;"></i></span>
+                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search" style="color: #9a97a7;"></i></span>
                             <input type="text" id="accountSearch" class="form-control border-start-0" placeholder="Search posts...">
                         </div>
                         <select id="accountFilter" class="form-select">
@@ -272,7 +385,7 @@ button.add-account:hover {
                     <div class="ui-container">
                         <h2>Your Posts</h2>
                         <div class="accounts mt-4">
-    <div class="accounts-grid mt-4" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(48%, 1fr)); gap:15px;">
+                        <div class="accounts-grid mt-4" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(48%, 1fr)); gap:15px;">
 
                         <?php if (!empty($posts)): ?>
                             <?php foreach ($posts as $post):
@@ -284,7 +397,8 @@ button.add-account:hover {
                                 $createdAt = utcToMalaysia($post['created_at'] ?? '');
                                 $accountId = htmlspecialchars($post['account_id'] ?? '');
                                 $accountType = htmlspecialchars($post['account_type'] ?? '');
-                                $accountName = getAccountName($token, $accountId);
+                                $accountPfp  = $accountImageMap[$accountId] ?? 'assets/default-avatar.png';
+                                $accountName = $accountNameMap[$accountId] ?? 'Unknown Account';
 
                                 // Status
                                 if (!empty($post['draft'])) {
@@ -301,81 +415,96 @@ button.add-account:hover {
                                 elseif (str_contains($platformKey, 'mastodon')) $platformKey = 'mastodon';
 
                                 $platformColors = [
-                                    'twitter' => '#1da1f2',
-                                    'mastodon' => '#6364ff',
-                                    'facebook' => '#1877f2',
-                                    'instagram' => '#e1306c',
-                                    'linkedin' => '#0077b5'
+                                    'twitter' => '#42a1dd',
+                                    'mastodon' => '#6565c8',
+                                    'facebook' => '#5883bb',
+                                    'instagram' => '#c75078',
+                                    'linkedin' => '#2789bd'
                                 ];
-                                $platformColor = $platformColors[$platformKey] ?? '#888';
+                                $platformColor = $platformColors[$platformKey] ?? '#9a97a7';
 
                                 // Status color
                                 $statusColors = [
-                                    'draft' => '#888',
-                                    'scheduled' => '#f0ad4e',
-                                    'published' => '#28a745'
+                                    'draft' => '#9a97a7',
+                                    'scheduled' => '#d19541',
+                                    'published' => '#47a55d'
                                 ];
-                                $statusColor = $statusColors[$statusClass] ?? '#888';
+                                $statusColor = $statusColors[$statusClass] ?? '#9a97a7';
                             ?>
-                            <div class="post-card d-flex justify-content-between align-items-start" style="padding:15px; border-radius:8px;">
+                            <div class="post-card d-flex justify-content-between align-items-start" style="padding:15px; border-radius:8px;" onclick="window.location.href='post-view.php?id=<?= urlencode($postId) ?>'">
                                 <!-- Left: Post info -->
-                                <div class="post-info" style="flex: 1; padding-right: 15px;">
+                                <div class="post-info" style="flex: 1; padding-right: 15px; height: 100%;">
                                     <div class="post-header mb-2">
-                                        <strong style="color: black; font-size: 17px; word-break: break-word; overflow-wrap: anywhere;"><?= $content ?></strong>
+                                        <!-- Account Info Row -->
+                                        <div class="d-flex align-items-center mb-2">
+
+                                            <img src="<?= $accountPfp ?>" 
+                                                alt="Profile Picture"
+                                                style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-right:10px; border:1px solid #ddd;">
+
+                                            <div>
+                                                <div style="font-weight:600; font-size:16px; color: #312b2f;">
+                                                    <?= htmlspecialchars($accountName) ?>
+                                                </div>
+                                                <div style="font-size:13px; color:#777;">
+                                                    <div class="d-flex gap-2">
+                                                        <span class="platform-tag"  style="background: #fff; color: <?= $platformColor ?>; padding:2px 8px; border-radius:4px; font-size:0.85rem; border: 2px solid <?= $platformColor ?> !important; font-weight: 500;">
+                                                            <?= ucfirst($accountType) ?>
+                                                        </span>
+                                                        <span style="background: <?= $statusColor ?>; color:white; padding:2px 8px; border-radius:4px; font-size:0.85rem;    border: 2px solid <?= $statusColor ?> !important; font-weight: 500;">
+                                                            <?= $statusLabel ?>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
                                     </div>
-
-                                    <!-- Tags -->
-                                    <div class="d-flex gap-2 mb-2">
-                                        <span class="platform-tag" 
-                                        style="background: #fff; 
-                                                color: <?= $platformColor ?>; 
-                                                padding:2px 8px; 
-                                                border-radius:4px; 
-                                                font-size:0.85rem; 
-                                                border: 2px solid <?= $platformColor ?> !important; 
-                                                font-weight: 500;">
-                                        <?= ucfirst($accountType) ?>
-                                    </span>
-
-                                        <span style="background: <?= $statusColor ?>; color:white; padding:2px 8px; border-radius:4px; font-size:0.85rem;">
-                                            <?= $statusLabel ?>
-                                        </span>
-                                    </div>
-
-
-                                    <small class="small-muted">
-                                        <i class="fas fa-share-square"></i> Published to: <b><?= htmlspecialchars($accountName) ?></b>
-                                    </small>
-                                    <small class="small-muted">
-                                        <i class="fas fa-clock"></i> Publish at: <b><?= $publishAt ?></b>
-                                    </small>
-                                    <small class="small-muted">
-                                        <i class="fas fa-calendar-alt"></i> Created at: <b><?= $createdAt ?></b>
-                                    </small>
-
-                                    <div style="margin-top:10px;">
-                                        <a href="post-view.php?id=<?= urlencode($postId) ?>" class="btn btn-sm btn-outline-secondary">
-                                            <i class="fas fa-search"></i> View Details
-                                        </a>
+                                    <!-- Post Title -->
+                                    <div style="margin-left: 7px; display: flex; flex-direction: column; justify-content: space-between; height: 70%;">
+                                        <strong style="color: #312b2f; font-size: 17px; word-break: break-word; overflow-wrap: anywhere;">
+                                            <?= $content ?>
+                                        </strong>
+                                        <div>
+                                            <small class="small-muted">
+                                                <i class="fas fa-clock" style="padding-right: 6px;"></i> <b><?= $publishAt ?></b>
+                                            </small>
+                                            <!-- <small class="small-muted">
+                                                <i class="fas fa-calendar-alt"></i> Created <b><?= $createdAt ?></b>
+                                            </small> -->
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- Right: Post images or placeholder -->
-                        <div class="post-images d-flex flex-column justify-content-center align-items-center" style="width:250px; min-height:250px; text-align:center;">
-                            <?php if (!empty($post['attachments'])): ?>
-                                <?php foreach ($post['attachments'] as $att): ?>
-                                    <?php if (!empty($att['url'])): ?>
-                                        <a href="<?= htmlspecialchars($att['url']) ?>" target="_blank">
-                                            <img src="<?= htmlspecialchars($att['url']) ?>" 
-                                                style="width:250px; height:250px; object-fit:cover; border-radius:6px; border:1px solid #ddd;">
-                                        </a>
+                                <?php 
+                                $validImages = [];
+
+                                if (!empty($post['attachments'])) {
+                                    foreach ($post['attachments'] as $att) {
+                                        if (!empty($att['url'])) {
+                                            $validImages[] = $att['url'];
+                                        }
+                                    }
+                                }
+
+                                $imageCount = count($validImages);
+                                $gridClass = $imageCount === 1 ? 'single' : ($imageCount > 1 ? 'multiple' : '');
+                                ?>
+
+                                <div class="post-images <?= $gridClass ?>">
+                                    <?php if ($imageCount > 0): ?>
+                                        <?php foreach ($validImages as $url): ?>
+                                            <div href="<?= htmlspecialchars($url) ?>" target="_blank">
+                                                <img src="<?= htmlspecialchars($url) ?>">
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <div class="d-flex flex-column justify-content-center align-items-center w-100 h-100">
+                                            <i class="fas fa-image" style="color:#ccc; font-size: 80px;"></i>
+                                            <p class="text-muted mb-0" style="font-size:0.9rem;">No image</p>
+                                        </div>
                                     <?php endif; ?>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                            <i class="fas fa-image" style="color:#ccc; font-size: 150px;"></i>
-                                <p class="text-muted" style="font-size:0.9rem;">No image</p>
-                            <?php endif; ?>
-                        </div>
+                                </div>
 
                             </div>
                             <?php endforeach; ?>
@@ -384,9 +513,9 @@ button.add-account:hover {
                         <?php endif; ?>
 
                         <div id="noResultsMessage" class="text-center text-muted" style="grid-column: 1 / -1; padding: 30px; display: none;">
-    <i class="fas fa-exclamation-circle fa-2x mb-2"></i><br>
-    <strong>No posts found.</strong>
-</div>
+                            <i class="fas fa-exclamation-circle fa-2x mb-2"></i><br>
+                            <strong>No posts found.</strong>
+                        </div>
 
                         </div>
 
@@ -406,42 +535,64 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterSelect = document.getElementById('accountFilter');
     const postCards = document.querySelectorAll('.accounts-grid .post-card');
 
-    function filterPosts() {
-    const searchTerm = searchInput.value.toLowerCase().trim();
-    const selectedPlatform = filterSelect.value.toLowerCase();
-    let anyVisible = false;
-
-    postCards.forEach(card => {
-        const content = card.querySelector('strong')?.textContent.toLowerCase() || '';
-        let platformTag = card.querySelector('.platform-tag')?.textContent.toLowerCase().trim() || '';
-
-        // Normalize platform
-        if (platformTag.includes('twitter')) platformTag = 'twitter';
-        else if (platformTag.includes('mastodon')) platformTag = 'mastodon';
-        else if (platformTag.includes('facebook')) platformTag = 'facebook';
-        else if (platformTag.includes('instagram')) platformTag = 'instagram';
-        else if (platformTag.includes('linkedin')) platformTag = 'linkedin';
-
-        const matchesSearch = content.includes(searchTerm);
-        const matchesPlatform = selectedPlatform === '' || platformTag === selectedPlatform;
-
-        if (matchesSearch && matchesPlatform) {
-            card.classList.remove('hidden');
-            anyVisible = true;
-        } else {
-            card.classList.add('hidden');
+    function getPlatformIcon(platform) {
+        switch (platform) {
+            case 'twitter':
+                return '<i class="fab fa-twitter"></i>';
+            case 'facebook':
+                return '<i class="fab fa-facebook"></i>';
+            case 'instagram':
+                return '<i class="fab fa-instagram"></i>';
+            case 'linkedin':
+                return '<i class="fab fa-linkedin"></i>';
+            case 'mastodon':
+                return '<i class="fab fa-mastodon"></i>';
+            default:
+                return '<i class="fas fa-share"></i>';
         }
-    });
+    }
 
-    // Show or hide "No posts found" message
-    document.getElementById('noResultsMessage').style.display = anyVisible ? 'none' : 'block';
-}
+    function filterPosts() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedPlatform = filterSelect.value.toLowerCase();
+        let anyVisible = false;
 
+        postCards.forEach(card => {
+            const content = card.querySelector('strong')?.textContent.toLowerCase() || '';
+            const platformElement = card.querySelector('.platform-tag');
+            let platformTag = platformElement?.textContent.toLowerCase().trim() || '';
+
+            // Normalize platform
+            if (platformTag.includes('twitter')) platformTag = 'twitter';
+            else if (platformTag.includes('mastodon')) platformTag = 'mastodon';
+            else if (platformTag.includes('facebook')) platformTag = 'facebook';
+            else if (platformTag.includes('instagram')) platformTag = 'instagram';
+            else if (platformTag.includes('linkedin')) platformTag = 'linkedin';
+
+            // Inject icon (only once)
+            if (platformElement && !platformElement.dataset.iconInjected) {
+                platformElement.innerHTML = getPlatformIcon(platformTag) + platformElement.textContent;
+                platformElement.dataset.iconInjected = "true";
+            }
+
+            const matchesSearch = content.includes(searchTerm);
+            const matchesPlatform = selectedPlatform === '' || platformTag === selectedPlatform;
+
+            if (matchesSearch && matchesPlatform) {
+                card.classList.remove('hidden');
+                anyVisible = true;
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('noResultsMessage').style.display = anyVisible ? 'none' : 'block';
+    }
 
     searchInput.addEventListener('input', filterPosts);
     filterSelect.addEventListener('change', filterPosts);
 
-    filterPosts(); // run once on page load
+    filterPosts(); // run once on load
 });
 </script>
 

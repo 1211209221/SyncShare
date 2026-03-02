@@ -190,7 +190,7 @@ pre { background: #04a3ce; color: white; padding: 0px 25px; border-radius: 0px; 
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
-    color: #888;
+    color: #9a97a7;
 }
 
 .ui-container{
@@ -239,7 +239,7 @@ input, select, button, span{
 
 #accountSearch, #accountFilter, #accountSearch::placeholder{
     font-size: 17px;
-    color: #888;
+    color: #9a97a7;
     margin: 0;
 }
 
@@ -330,7 +330,7 @@ button.add-account:hover {
             ?>
             <div style="width:100%;">
                 <pre id="output"></pre>
-                <div class="py-4 px-4">
+                <div class="py-3 px-3" style="background-color: white; margin-bottom: 20px;">
                     <h1>Accounts</h1>
                 </div>
                 <div class="d-flex">
@@ -338,7 +338,7 @@ button.add-account:hover {
                         <!-- Search & Filter -->
                         <div class="d-flex gap-2 mb-3">
                             <div class="input-group">
-                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search" style="color: #888;"></i></span>
+                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search" style="color: #9a97a7;"></i></span>
                                 <input type="text" id="accountSearch" class="form-control border-start-0" placeholder="Search by account name...">
                             </div>
                             <select id="accountFilter" class="form-select">

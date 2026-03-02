@@ -183,7 +183,7 @@ pre { background: #04a3ce; color: white; padding: 0px; border-radius: 0px; margi
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     margin-bottom: 20px;
-    color: #888;
+    color: #9a97a7;
 }
 
 .actions i:hover {
@@ -205,7 +205,7 @@ pre { background: #04a3ce; color: white; padding: 0px; border-radius: 0px; margi
             ?>
             <div style="width:100%;">
                 <pre id="output"></pre>
-                <div class="py-4 px-4">
+                <div class="py-3 px-3" style="background-color: white; margin-bottom: 20px;">
                     <h1>Dashboard</h1>
                 </div>
                 <div class="d-flex">

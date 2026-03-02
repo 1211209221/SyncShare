@@ -18,6 +18,7 @@
 		font-family: 'Lato', sans-serif;
 		/* font-family: 'Poppins', sans-serif; */
 		background: #f3f4f6;
+		color: #312b2f;
 	}
 
 	input, textarea, select{
@@ -289,23 +290,17 @@
 			<a class="navbar-brand" href="dashboard.php">Sync<b>Share</b></a>
 			<ul class="nav nav-pills flex-column mb-auto">
 				<li class="nav-item">
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'dashboard.php'): ?> active <?php endif; ?>" href="dashboard.php">
-						<i class="fas fa-user-shield me-2"></i> Dashboard
-					</a>
-				</li>
-				<li class="nav-item">
 					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'account-all.php'): ?> active <?php endif; ?>" href="account-all.php">
-						<i class="fas fa-users me-2"></i> Accounts
+						<i class="fas fa-users me-2"></i> Dashboard
 					</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-all.php' || 'post-new.php' || 'post-view.php'): ?> active <?php endif; ?>" href="post-all.php">
+					<a class="nav-link <?php if (
+						basename($_SERVER['PHP_SELF']) == 'post-all.php' ||
+						basename($_SERVER['PHP_SELF']) == 'post-new.php' ||
+						basename($_SERVER['PHP_SELF']) == 'post-view.php'
+					): ?> active <?php endif; ?>" href="post-all.php">
 						<i class="fas fa-mail-bulk me-2"></i> Posts
-					</a>
-				</li>
-				<li class="nav-item">
-					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-all.php'): ?> active <?php endif; ?>" href="post_all.php">
-						<i class="fas fa-user-shield me-2"></i> Posts
 					</a>
 				</li>
 			</ul>
