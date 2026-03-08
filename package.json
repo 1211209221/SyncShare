@@ -1,0 +1,26 @@
+{
+  "name": "syncshare",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1211209221/SyncShare.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/1211209221/SyncShare/issues"
+  },
+  "homepage": "https://github.com/1211209221/SyncShare#readme",
+  "dependencies": {
+    "@google/genai": "^1.43.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1"
+  }
+}

@@ -38,6 +38,71 @@
 <?php
 session_start();
 
+
+
+// ✅ Your Pixazo API Key
+$pixazoApiKey = "17c0f129d252488eb099ad0f16da85d0";
+
+// 🔹 AJAX: Generate AI Image
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax_generate_image"])) {
+
+    header("Content-Type: application/json");
+
+    $prompt = trim($_POST["prompt"] ?? "");
+
+    if (empty($prompt)) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Prompt is required"
+        ]);
+        exit;
+    }
+
+    $pixazoUrl = "https://gateway.pixazo.ai/getImage/v1/getSDXLImage";
+
+    $payload = json_encode([
+        "prompt" => $prompt,
+        "negative_prompt" => "low quality, blurry",
+        "height" => 1024,
+        "width" => 1024,
+        "num_steps" => 20,
+        "guidance_scale" => 5,
+        "seed" => rand(1, 999999)
+    ]);
+
+    $ch = curl_init($pixazoUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => [
+            "Content-Type: application/json",
+            "Ocp-Apim-Subscription-Key: $pixazoApiKey"
+        ],
+        CURLOPT_POSTFIELDS => $payload
+    ]);
+
+    $result = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $decoded = json_decode($result, true);
+
+    // 🔹 Proper JSON response for JS
+    if ($httpCode === 200 && isset($decoded['imageUrl'])) {
+        echo json_encode([
+            "success" => true,
+            "imageUrl" => $decoded['imageUrl']
+        ]);
+    } else {
+        echo json_encode([
+            "success" => false,
+            "message" => "Image generation failed",
+            "rawResponse" => $result
+        ]);
+    }
+
+    exit;
+}
 // ===========================
 // 1️⃣ Check API token
 // ===========================
@@ -156,7 +221,7 @@ if ($httpcode !== 200) {
 // ===========================
 // 🔹 Step 2: Handle Post Submission
 // ===========================
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"])) {
     $accounts_selected = isset($_POST['accounts']) ? array_map('intval', $_POST['accounts']) : [];
     $content = trim($_POST['content'] ?? '');
     $upload_tokens = [];
@@ -167,45 +232,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($aiOutputText)) $content = $aiOutputText;
     }
 
-    // 🔹 1️⃣ Handle user-uploaded files
-    if (!empty($_FILES['media']['tmp_name'])) {
-        foreach ($_FILES['media']['tmp_name'] as $i => $tmpFile) {
-            $result = uploadMediaToSocialBu($tmpFile, $token);
-            if (!empty($result['success'])) {
-                $upload_tokens[] = $result['upload_token'];
-            } else {
-                $responseMessage .= "<div class='alert alert-danger'>❌ Media upload failed: " 
-                    . htmlspecialchars($result['error'] ?? 'Unknown error') 
-                    . "</div>";
-            }
-        }
-    }
-
     // 🔹 2️⃣ Handle Unsplash-selected images
+    // 🔹 2️⃣ Handle library images (Unsplash + AI)
     if (!empty($_POST['library_images'])) {
-        $unsplashImages = json_decode($_POST['library_images'], true);
-        if (is_array($unsplashImages)) {
-            foreach ($unsplashImages as $url) {
-                $imageData = @file_get_contents($url);
-                if ($imageData !== false) {
-                    // Temporary file for SocialBu upload
-                    $tempFile = tempnam(sys_get_temp_dir(), 'unsplash_');
-                    file_put_contents($tempFile, $imageData);
 
-                    $result = uploadMediaToSocialBu($tempFile, $token);
-                    if (!empty($result['success'])) {
-                        $upload_tokens[] = $result['upload_token'];
-                    } else {
-                        $responseMessage .= "<div class='alert alert-danger'>
-                            Unsplash upload failed: "
-                            . htmlspecialchars($result['error'] ?? 'Unknown error')
-                            . "</div>";
-                    }
+        $images = json_decode($_POST['library_images'], true);
 
-                    unlink($tempFile); // delete temp file
+        if (is_array($images)) {
+
+            foreach ($images as $img) {
+
+                // If it's a local uploaded AI image
+                if (file_exists($img)) {
+
+                    $result = uploadMediaToSocialBu($img, $token);
+
                 } else {
-                    $responseMessage .= "<div class='alert alert-warning'>
-                        ❌ Failed to fetch Unsplash image: " . htmlspecialchars($url) . "</div>";
+
+                    // Otherwise treat as URL (Unsplash)
+                    $imageData = @file_get_contents($img);
+
+                    if ($imageData !== false) {
+
+                        $tempFile = tempnam(sys_get_temp_dir(), 'lib_');
+                        file_put_contents($tempFile, $imageData);
+
+                        $result = uploadMediaToSocialBu($tempFile, $token);
+
+                        unlink($tempFile);
+
+                    } else {
+                        continue;
+                    }
+                }
+
+                if (!empty($result['success'])) {
+                    $upload_tokens[] = $result['upload_token'];
                 }
             }
         }
@@ -272,6 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             . "</pre>";
     }
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -292,7 +355,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 .account-item img { width: 47px; height: 47px; border-radius: 50%; margin-right: 10px;}
 footer { text-align: center; margin-top: 25px; color: #9a97a7; }
 #aiOutput{
-      height: 250px;
+      height: 160px;
 
 }
 
@@ -575,6 +638,15 @@ label{
     color: #312b2f;
 }
 
+#aiImageResult img{
+    transition: 0.2s;
+}
+
+#aiImageResult img:hover{
+    transform: scale(1.03);
+    filter: brightness(50%);
+}
+
 </style>
 </head>
 <body>
@@ -658,13 +730,14 @@ label{
                                     </div>
 
                                     <button type="submit" class="btn btn-primary w-100">Create Post</button>
+                                    
 
-                                    <?php if ($responseMessage): ?>
+                                    <!-- <?php if ($responseMessage): ?>
                                         <div class="mt-4">
                                         <h5>Response</h5>
                                         <?= $responseMessage ?>
                                         </div>
-                                    <?php endif; ?>
+                                    <?php endif; ?> -->
 
                                     <footer>
                                         <a href="dashboard.php">← Back to Dashboard</a>
@@ -673,42 +746,47 @@ label{
                             </div>
                             <div class="ui-container second" style="width: 45% !important;">
                                 <h2 style="color: #312b2f; font-size: 24px;">AI Assistant <i class="fas fa-cog" style="padding-left: 5px;"></i></h2>
-                                <hr style="margin: 10px 0px 15px 0px;">
-                                    <div class="mb-3">
-                                        <label class="form-label">AI-Rewrite</label>
-                                        <div class="input-group mb-2">
-                                            <input type="text" id="aiInstruction" class="form-control" placeholder="e.g., Make this sound more friendly">
-                                            <button type="button" id="applyAI" class="btn btn-outline-secondary"><i class="fas fa-magic" style="margin-right: 6px;"></i> Apply AI</button>
-                                        </div>
-                                        <small class="text-muted">Enter your instruction or choose one of the style options below.</small>
-
-                                        <!-- ✅ Style Options -->
-                                        <div class="mt-2 d-flex flex-wrap gap-2">
-                                            <label><input type="checkbox" class="ai-option" value="short"> Short</label>
-                                            <label><input type="checkbox" class="ai-option" value="detailed"> Detailed</label>
-                                            <label><input type="checkbox" class="ai-option" value="hashtags"> Hashtags</label>
-                                            <label><input type="checkbox" class="ai-option" value="professional"> Professional</label>
-                                            <label><input type="checkbox" class="ai-option" value="trendy"> Trendy</label>
-                                            <label><input type="checkbox" class="ai-option" value="emojis"> Emojis</label>
-                                        </div>
-
-                                        <!-- ✅ Separate AI output -->
-                                        <textarea class="form-control mt-3" id="aiOutput" name="ai_output" rows="4" placeholder="AI rewrite will appear here..."></textarea>
-                                        <div id="aiMessage" class="mt-2"></div>
-                                    </div>  
-
-                                    <div class="mb-3">
-                                        <label class="form-label">AI Image Generator</label>
-                                        <div class="input-group mb-2">
-                                            <input type="text" id="aiImagePrompt" class="form-control" placeholder="Describe the image you want">
-                                            <button type="button" id="generateAIImage" class="btn btn-outline-secondary">
-                                                <i class="fas fa-image" style="margin-right: 6px;"></i> Generate Image
-                                            </button>
-                                        </div>
-                                        <small class="text-muted">Enter a prompt to generate an image using Gemini AI.</small>
-                                        <div id="aiImageMessage" class="mt-2"></div>
-                                        <div id="aiImageResult" class="mt-3 d-flex flex-wrap gap-2"></div>
+                                <hr style="margin: 10px 0px 16px 0px;">
+                                <div class="mb-3">
+                                    <label class="form-label">AI-Rewrite</label>
+                                    <div class="input-group mb-2">
+                                        <input type="text" id="aiInstruction" class="form-control" placeholder="e.g., Make this sound more friendly">
+                                        <button type="button" id="applyAI" class="btn btn-outline-secondary"><i class="fas fa-magic" style="margin-right: 6px;"></i> Apply AI</button>
                                     </div>
+                                    <small class="text-muted">Enter your instruction or choose one of the style options below.</small>
+
+                                    <!-- ✅ Style Options -->
+                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                        <label><input type="checkbox" class="ai-option" value="short"> Short</label>
+                                        <label><input type="checkbox" class="ai-option" value="detailed"> Detailed</label>
+                                        <label><input type="checkbox" class="ai-option" value="hashtags"> Hashtags</label>
+                                        <label><input type="checkbox" class="ai-option" value="professional"> Professional</label>
+                                        <label><input type="checkbox" class="ai-option" value="trendy"> Trendy</label>
+                                        <label><input type="checkbox" class="ai-option" value="emojis"> Emojis</label>
+                                    </div>
+
+                                    <!-- ✅ Separate AI output -->
+                                    <textarea class="form-control mt-3" id="aiOutput" name="ai_output" rows="4" placeholder="AI rewrite will appear here..."></textarea>
+                                    <div id="aiMessage" class="mt-2"></div>
+                                </div>  
+
+                                <div class="mb-3">
+                                    <label class="form-label">AI Image Generator</label>
+                                    <div class="input-group mb-2">
+                                        <input type="text" id="aiImagePrompt" class="form-control" placeholder="Describe the image you want">
+                                        <button type="button" id="generateAIImage" class="btn btn-outline-secondary">
+                                            <i class="fas fa-image" style="margin-right: 6px;"></i> Generate Image
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Enter a prompt to generate an image using Gemini AI.</small>
+                                    <div id="aiImageMessage" class="mt-2"></div>
+                                    <div id="aiImageResult" class="mt-3 d-flex flex-wrap gap-2"></div>
+                                </div>
+                                <?php if (!empty($generatedImageUrl)): ?>
+                                    <h3>Generated Image:</h3>
+                                    <img src="<?php echo htmlspecialchars($generatedImageUrl); ?>" 
+                                        style="max-width: 500px; border-radius: 10px;">
+                                <?php endif; ?>
                             </div>
                         </div>
                     </form>
@@ -1030,61 +1108,148 @@ document.getElementById('unsplashModal').addEventListener('shown.bs.modal', () =
     }
 });
 
+document.querySelector("form").addEventListener("submit", function(e) {
 
+    const checkedAccounts = document.querySelectorAll('.account-checkbox:checked');
 
+    if (checkedAccounts.length === 0) {
+        e.preventDefault(); // stop form submission
+        alert("⚠️ Please select at least one account before creating the post.");
 
-
-
-
-
-
-document.getElementById('generateAIImage').addEventListener('click', async () => {
-    const prompt = document.getElementById('aiImagePrompt').value.trim();
-    const messageBox = document.getElementById('aiImageMessage');
-    const resultContainer = document.getElementById('aiImageResult');
-    const button = document.getElementById('generateAIImage');
-
-    messageBox.innerHTML = '';
-    resultContainer.innerHTML = '';
-
-    if (!prompt) {
-        messageBox.innerHTML = `<div class="text-danger">⚠️ Please enter an image prompt.</div>`;
-        return;
-    }
-
-    button.disabled = true;
-    button.textContent = "⏳ Generating...";
-
-    try {
-        const res = await fetch('ai_image_generation.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ prompt })
+        // scroll to the accounts section
+        document.querySelector(".account-list").scrollIntoView({
+            behavior: "smooth",
+            block: "center"
         });
-
-        const data = await res.json();
-
-        if (data.success && data.images && data.images.length > 0) {
-            data.images.forEach(url => {
-                const img = document.createElement('img');
-                img.src = url;
-                img.className = 'preview-thumb';
-                resultContainer.appendChild(img);
-            });
-            messageBox.innerHTML = `<div class="text-success">✅ Image(s) generated successfully.</div>`;
-        } else {
-            messageBox.innerHTML = `<div class="text-danger">❌ Failed to generate image: ${data.error || 'Unknown error'}</div>`;
-        }
-
-    } catch (err) {
-        messageBox.innerHTML = `<div class="text-danger">❌ Error: ${err.message}</div>`;
     }
 
-    button.disabled = false;
-    button.textContent = "Generate Image";
 });
 </script>
 
+
+<script>
+document.getElementById("generateAIImage").addEventListener("click", async function () {
+    const prompt = document.getElementById("aiImagePrompt").value.trim();
+    const messageBox = document.getElementById("aiImageMessage");
+    const resultBox = document.getElementById("aiImageResult");
+
+    if (!prompt) {
+        messageBox.innerHTML = "<span class='text-danger'>Please enter a prompt.</span>";
+        return;
+    }
+
+    messageBox.innerHTML = "<span class='text-info'>Generating image... please wait.</span>";
+    resultBox.innerHTML = "";
+
+    try {
+        const formData = new FormData();
+        formData.append("ajax_generate_image", "1");
+        formData.append("prompt", prompt);
+
+        const res = await fetch("ai_generate_image.php", { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (data.success && data.imageUrl) {
+            // --- Wrapper div ---
+            const wrapper = document.createElement("div");
+            wrapper.style.position = "relative";
+            wrapper.style.display = "inline-block";
+            wrapper.style.cursor = "pointer";
+            wrapper.style.marginRight = "10px";
+
+            // --- Image element ---
+            const img = document.createElement("img");
+            img.src = data.imageUrl;
+            img.style.maxWidth = "200px";
+            img.style.borderRadius = "10px";
+            img.style.display = "block";
+
+            // --- Hover overlay text ---
+            const overlay = document.createElement("div");
+            overlay.textContent = "Add Image";
+            overlay.style.position = "absolute";
+            overlay.style.top = "0";
+            overlay.style.left = "0";
+            overlay.style.width = "100%";
+            overlay.style.height = "100%";
+            overlay.style.display = "flex";
+            overlay.style.justifyContent = "center";
+            overlay.style.alignItems = "center";
+            overlay.style.color = "white";
+            overlay.style.fontWeight = "bold";
+            overlay.style.fontSize = "18px";
+            overlay.style.backgroundColor = "rgba(0,0,0,0.5)";
+            overlay.style.borderRadius = "10px";
+            overlay.style.opacity = "0";
+            overlay.style.transition = "opacity 0.2s";
+
+            wrapper.addEventListener("mouseenter", () => overlay.style.opacity = "1");
+            wrapper.addEventListener("mouseleave", () => overlay.style.opacity = "0");
+
+            wrapper.addEventListener("click", async () => {
+
+    messageBox.innerHTML = "<span class='text-info'>Downloading image...</span>";
+
+    try {
+
+        const formData = new FormData();
+        formData.append("imageUrl", data.imageUrl);
+
+        const resp = await fetch("upload_image.php", {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await resp.json();
+
+        if (!result.success) {
+            messageBox.innerHTML = "<span class='text-danger'>❌ " + result.message + "</span>";
+            return;
+        }
+
+        const savedPath = result.filename;
+
+        // Add to hidden input for submission
+        let currentImages = [];
+
+        try {
+            currentImages = JSON.parse(document.getElementById("library_images").value || "[]");
+        } catch(e){}
+
+        currentImages.push(savedPath);
+
+        document.getElementById("library_images").value = JSON.stringify(currentImages);
+
+        // Show preview
+        const preview = document.createElement("img");
+        preview.src = savedPath;
+        preview.className = "preview-thumb";
+
+        document.getElementById("previewContainer").appendChild(preview);
+
+        messageBox.innerHTML = "<span class='text-success'>✅ Image added to post.</span>";
+
+    } catch(err) {
+        console.error(err);
+        messageBox.innerHTML = "<span class='text-danger'>❌ Failed to download image</span>";
+    }
+});
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(overlay);
+            resultBox.innerHTML = "";
+            resultBox.appendChild(wrapper);
+
+            messageBox.innerHTML = "<span class='text-success'>Image generated successfully! Hover and click 'Add Image' to include it in your post.</span>";
+        } else {
+            messageBox.innerHTML = `<span class='text-danger'>❌ ${data.message || 'Image generation failed.'}</span>`;
+        }
+    } catch (err) {
+        console.error(err);
+        messageBox.innerHTML = `<span class='text-danger'>❌ Error: ${err.message}</span>`;
+    }
+});
+</script>
 <!-- Debug container somewhere below the AI input -->
 <!-- <pre id="aiPromptDebug" style="background:#eef;padding:10px;border-radius:8px;margin-top:10px;"></pre> -->
 </body>
