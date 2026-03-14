@@ -18,10 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode($response, true);
     if (!empty($data['authToken'])) {
         $_SESSION['token'] = $data['authToken'];
+        $_SESSION['user_email'] = $email;   // store email in session
+
         header('Location: dashboard.php');
         exit;
     } else {
-        $error = "Login failed. Please check your credentials.";
+            $error = "Login failed. Please check your credentials.";
     }
 }
 ?>

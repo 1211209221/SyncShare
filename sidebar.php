@@ -284,6 +284,23 @@
 		color: #04a3ce !important;
 		transform: scale(1.02);
 	}
+	.signout{
+		background-color: white !important;
+		transition: 0.2s;
+	}
+	.signout:hover{
+		background-color: white !important;
+	}
+	.signout_dropdown{
+		width: 180px;
+	}
+	.signout_dropdown a{
+		color: inherit !important;
+	}
+	a{
+		color: inherit;
+		text-decoration: none;
+	}
 </style>
 	<nav class="navbar navbar-light bg-light flex-column vh-100 sidebar">
 		<div class="flex-column" style="width: 100%; display: flex;">
@@ -301,6 +318,11 @@
 						basename($_SERVER['PHP_SELF']) == 'post-view.php'
 					): ?> active <?php endif; ?>" href="post-all.php">
 						<i class="fas fa-mail-bulk me-2"></i> Posts
+					</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-calendar.php'): ?> active <?php endif; ?>" href="post-calendar.php">
+						<i class="fas fa-users me-2"></i> Content Calendar
 					</a>
 				</li>
 			</ul>

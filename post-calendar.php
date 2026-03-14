@@ -117,11 +117,13 @@ usort($posts, function($a, $b) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>📋 My Posts</title>
+<title>Content Calendar</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/all.min.css">
 <link href="https://fonts.googleapis.com/css?family=Lato|Poppins&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <style>
 body {
@@ -370,6 +372,114 @@ button.add-account:hover {
     border: 1px solid #f3f4f6;
     background: white;
 }
+#calendar {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.fc-event {
+    border: none;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.fc-daygrid-event-harness a{
+    color: white;
+    padding-right: 10px;
+}
+.fc-theme-standard td{
+    height: 120px;
+
+}
+a[tabindex="0"]{
+    width: 100%;
+    background: #04a3ce;
+    padding: 5px 15px !important;
+    color: white;
+    transition: 0.2s;
+    font-weight: bold;
+}
+a[tabindex="0"]:hover{
+    background: #1b78aeff !important;
+    transform: scale(1.02);
+}
+.fc-daygrid-event-harness a{
+    transition: 0.2s;
+}
+.fc-daygrid-event-harness a:hover{
+    transform: scale(1.02);
+}
+.fc .fc-daygrid-event{
+    margin-bottom: 1px;
+}
+.fc-daygrid-event .fc-event-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fc-event-time{
+    font-weight: bold;
+}
+.fc-event-title{
+    font-weight: 400 !important;
+}
+.fc-daygrid-event {
+    overflow: hidden;
+}
+.fc-daygrid-day-events {
+    margin-bottom: 0px !important;
+}
+
+.fc-daygrid-event-dot {
+    color: white !important;
+    border: calc(var(--fc-daygrid-event-dot-width) / 2) solid #ffffff;
+    margin-left: 10px;
+}
+.fc .fc-daygrid-day-top{
+    flex-direction: row;
+}
+.fc-header-toolbar.fc-toolbar.fc-toolbar-ltr{
+    background-color: #04a3ce;
+    color: white;
+    margin: 0;
+    border-radius: 10px 10px 0px 0px;
+    padding: 10px 0px;
+}
+.fc-button-primary{
+    background-color: transparent !important;
+}
+.fc-button-primary:hover{
+    background-color: transparent !important;
+    transform: scale(1.2) !important;
+}
+.fc .fc-toolbar-title{
+    font-size: 35px;
+}
+tbody tr:nth-child(even){
+    background-color: #f8f8f8 !important;
+}
+thead th:first-child, thead th:last-child{
+    border-top-left-radius: 0px !important;
+    border-top-right-radius: 0px !important;
+}
+.fc-popover-title{
+    font-weight: bold;
+}
+.fc-popover-close.fc-icon.fc-icon-x{
+    color: #6d6a7a;
+    transition: 0.2s;
+    font-weight: bold;
+}
+.fc-popover-close.fc-icon.fc-icon-x:hover{
+    transform: scale(1.2) !important;
+}
+thead[role="presentation"]{
+    background-color: #f8f8f8 !important;
+}
+.fc .fc-daygrid-day.fc-day-today {
+    background-color: rgb(0 147 200 / 35%);
+    color: white;
+}
 </style>
 </head>
 <body>
@@ -378,7 +488,7 @@ button.add-account:hover {
         <?php include 'sidebar.php'; ?>
         <div style="width:100%;">
             <div class="py-3 px-3 d-flex justify-content-between align-items-center" style="background-color:white; margin-bottom:20px;">
-                    <h1 class="mb-0">Posts List</h1>
+                    <h1 class="mb-0">Content Calendar</h1>
                     <div class="dropdown">
                         <button class="btn dropdown-toggle signout" type="button" data-bs-toggle="dropdown"
                             style="background:none;color:#312b2f;font-weight:bold;margin:0!important;">
@@ -399,177 +509,11 @@ button.add-account:hover {
                     <div style="width: 53%; margin: 0px 20px 15px 10px; color: #44424d;">
                                 <a href="dashboard.php">Posts</a> > <a style="color: #04a3ce !important; font-weight: bold;">Post List</a>
                             </div>
-                    <div class="d-flex gap-2 mb-3">
-                        <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search" style="color: #9a97a7;"></i></span>
-                            <input type="text" id="accountSearch" class="form-control border-start-0" placeholder="Search posts...">
-                        </div>
-                        <select id="accountFilter" class="form-select">
-                            <option value="">All Platforms</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="twitter">Twitter</option>
-                            <option value="facebook">Facebook</option>
-                            <option value="linkedin">LinkedIn</option>
-                            <option value="mastodon">Mastodon</option>
-                        </select>
-                        <select id="statusFilter" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="draft">Draft</option>
-                            <option value="scheduled">Scheduled</option>
-                            <option value="published">Published</option>
-                        </select>
-                        <button class="add-account btn btn-primary w-100" onclick="window.location.href='post-new.php'">
-                            <i class="fas fa-plus"></i><b> New Post</b>
-                        </button>
-                    </div>
+                    
                     <div class="ui-container">
                         <h2 style="color: #312b2f !important;">Your Posts</h2>
-                        <div class="accounts mt-4">
-                        <div class="accounts-grid mt-4" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(48%, 1fr)); gap:15px;">
-
-                        <?php if (!empty($posts)): ?>
-                            <?php foreach ($posts as $post):
-                                $fullContent = htmlspecialchars($post['content'] ?? '[No content]');
-                                $content = strlen($fullContent) > 80 ? substr($fullContent, 0, 80) . '...' : $fullContent;
-
-                                $postId = htmlspecialchars($post['id'] ?? '');
-                                $publishAt = utcToMalaysia($post['publish_at'] ?? '');
-                                $createdAt = utcToMalaysia($post['created_at'] ?? '');
-                                $accountId = htmlspecialchars($post['account_id'] ?? '');
-                                $accountType = htmlspecialchars($post['account_type'] ?? '');
-                                $accountPfp  = $accountImageMap[$accountId] ?? 'assets/default-avatar.png';
-                                $accountName = $accountNameMap[$accountId] ?? 'Unknown Account';
-
-                                // Status
-                                if (!empty($post['draft'])) {
-                                    $statusClass = 'draft'; $statusLabel = 'Draft';
-                                } elseif (!empty($post['published'])) {
-                                    $statusClass = 'published'; $statusLabel = 'Published';
-                                } else {
-                                    $statusClass = 'scheduled'; $statusLabel = 'Scheduled';
-                                }
-
-                                // Platform color
-                                $platformKey = strtolower($accountType);
-                                if (str_contains($platformKey, 'twitter')) $platformKey = 'twitter';
-                                elseif (str_contains($platformKey, 'mastodon')) $platformKey = 'mastodon';
-
-                                $platformColors = [
-                                    'twitter' => '#42a1dd',
-                                    'mastodon' => '#6565c8',
-                                    'facebook' => '#5883bb',
-                                    'instagram' => '#c75078',
-                                    'linkedin' => '#2789bd'
-                                ];
-                                $platformColor = $platformColors[$platformKey] ?? '#9a97a7';
-
-                                // Status color
-                                $statusColors = [
-                                    'draft' => '#9a97a7',
-                                    'scheduled' => '#d19541',
-                                    'published' => '#47a55d'
-                                ];
-                                $statusColor = $statusColors[$statusClass] ?? '#9a97a7';
-                            ?>
-                            <?php
-                                $redirectPage = ($statusClass === 'draft')
-                                    ? "post-edit.php?id=$postId"
-                                    : "post-view.php?id=$postId";
-                                ?>
-
-                                <div class="post-card d-flex justify-content-between align-items-start"
-                                    data-status="<?= strtolower($statusLabel) ?>"
-                                    onclick="window.location.href='<?= $redirectPage ?>'">
-                                <!-- Left: Post info -->
-                                <div class="post-info" style="flex: 1; padding-right: 15px; height: 100%;">
-                                    <div class="post-header mb-2">
-                                        <!-- Account Info Row -->
-                                        <div class="d-flex align-items-center mb-2">
-
-                                            <img src="<?= $accountPfp ?>" 
-                                                alt="Profile Picture"
-                                                style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-right:10px; border:1px solid #ddd;">
-
-                                            <div>
-                                                <div style="font-weight:600; font-size:16px; color: #312b2f;">
-                                                    <?= htmlspecialchars($accountName) ?>
-                                                </div>
-                                                <div style="font-size:13px; color:#777;">
-                                                    <div class="d-flex gap-2">
-                                                        <span class="platform-tag"  style="background: #fff; color: <?= $platformColor ?>; padding:2px 8px; border-radius:4px; font-size:0.85rem; border: 2px solid <?= $platformColor ?> !important; font-weight: 500;">
-                                                            <?= ucfirst($accountType) ?>
-                                                        </span>
-                                                        <span style="background: <?= $statusColor ?>; color:white; padding:2px 8px; border-radius:4px; font-size:0.85rem;    border: 2px solid <?= $statusColor ?> !important; font-weight: 500;">
-                                                            <?= $statusLabel ?>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                    <!-- Post Title -->
-                                    <div style="margin-left: 7px; display: flex; flex-direction: column; justify-content: space-between; height: 70%;">
-                                        <strong style="color: #312b2f; font-size: 17px; word-break: break-word; overflow-wrap: anywhere;">
-                                            <?= $content ?>
-                                        </strong>
-                                        <div>
-                                            <small class="small-muted">
-                                                <i class="fas fa-clock" style="padding-right: 6px;"></i> <b><?= $publishAt ?></b>
-                                            </small>
-                                            <!-- <small class="small-muted">
-                                                <i class="fas fa-calendar-alt"></i> Created <b><?= $createdAt ?></b>
-                                            </small> -->
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <?php 
-                                $validImages = [];
-
-                                if (!empty($post['attachments'])) {
-                                    foreach ($post['attachments'] as $att) {
-                                        if (!empty($att['url'])) {
-                                            $validImages[] = $att['url'];
-                                        }
-                                    }
-                                }
-
-                                $imageCount = count($validImages);
-                                $gridClass = $imageCount === 1 ? 'single' : ($imageCount > 1 ? 'multiple' : '');
-                                ?>
-
-                                <div class="post-images <?= $gridClass ?>">
-                                    <?php if ($imageCount > 0): ?>
-                                        <?php foreach ($validImages as $url): ?>
-                                            <div href="<?= htmlspecialchars($url) ?>" target="_blank">
-                                                <img src="<?= htmlspecialchars($url) ?>">
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <div class="d-flex flex-column justify-content-center align-items-center w-100 h-100">
-                                            <i class="fas fa-image" style="color:#ccc; font-size: 80px;"></i>
-                                            <p class="text-muted mb-0" style="font-size:0.9rem;">No image</p>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-
-                            </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p class="text-muted">No posts found.</p>
-                        <?php endif; ?>
-
-                        <div id="noResultsMessage" class="text-center text-muted" style="grid-column: 1 / -1; padding: 30px; display: none;">
-                            <i class="fas fa-exclamation-circle fa-2x mb-2"></i><br>
-                            <strong>No posts found.</strong>
-                        </div>
-
-                        </div>
-
-
-
-                        </div>
+                        <div id="calendar"></div>
+                        
                     </div>
                 </div>
             </div>
@@ -649,7 +593,89 @@ document.addEventListener('DOMContentLoaded', () => {
     filterPosts(); // run once on load
 });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
 
+    const calendarEl = document.getElementById('calendar');
+
+    const events = [
+    <?php foreach ($posts as $post):
+
+        // Skip drafts
+        if (!empty($post['draft'])) {
+            continue;
+        }
+
+        $postId = $post['id'] ?? '';
+        $content = addslashes(substr($post['content'] ?? 'No content',0,50));
+        $publish = $post['publish_at'] ?? '';
+        $status = !empty($post['published']) ? 'published' : 'scheduled';
+
+        $redirect = "post-view.php?id=$postId";
+    ?>
+    {
+        title: "<?= $content ?>",
+        start: "<?= $publish ?>",
+        url: "<?= $redirect ?>",
+        extendedProps: {
+            status: "<?= $status ?>"
+        }
+    },
+    <?php endforeach; ?>
+    ];
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+
+        initialView: 'dayGridMonth',
+        height: "auto",
+
+        headerToolbar: {
+            left: 'prev',
+            center: 'title',
+            right: 'next'
+        },
+
+        events: events,
+
+        dayMaxEvents: 2, // 👈 max posts shown per day
+
+        eventTimeFormat: {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        },
+
+        moreLinkContent: function(arg) {
+            return "More ++"; // 👈 custom text
+        },
+
+        eventClick: function(info) {
+            info.jsEvent.preventDefault();
+            if (info.event.url) {
+                window.location.href = info.event.url;
+            }
+        },
+
+        eventDidMount: function(info) {
+
+            const status = info.event.extendedProps.status;
+
+            if (status === "draft")
+                info.el.style.backgroundColor = "#bfbcca";
+
+            if (status === "scheduled")
+                info.el.style.backgroundColor = "#d5a664";
+
+            if (status === "published")
+                info.el.style.backgroundColor = "#59b062";
+
+        }
+
+    });
+
+    calendar.render();
+});
+</script>
 
 </body>
 

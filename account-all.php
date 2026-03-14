@@ -86,6 +86,7 @@ if (!isset($_SESSION['token'])) {
     header('Location: login.php');
     exit;
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -330,8 +331,22 @@ button.add-account:hover {
             ?>
             <div style="width:100%;">
                 <pre id="output"></pre>
-                <div class="py-3 px-3" style="background-color: white; margin-bottom: 20px;">
-                    <h1>Accounts</h1>
+                <div class="py-3 px-3 d-flex justify-content-between align-items-center" style="background-color:white; margin-bottom:20px;">
+                    <h1 class="mb-0">Accounts</h1>
+                    <div class="dropdown">
+                        <button class="btn dropdown-toggle signout" type="button" data-bs-toggle="dropdown"
+                            style="background:none;color:#312b2f;font-weight:bold;margin:0!important;">
+                            <i class="fas fa-user" style="padding-right:6px;"></i>
+                            <?= htmlspecialchars($_SESSION['user_email'] ?? 'Account') ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item text-danger signout_dropdown" href="logout.php">
+                                    <i class="fas fa-sign-out-alt me-2"></i> <b>Logout</b>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="d-flex">
                     <div class="dashboard container container-fluid" id="dashboard">

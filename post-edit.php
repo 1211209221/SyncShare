@@ -34,6 +34,7 @@
     </div>
 </div>
 
+
 <?php
 // Current Malaysia time
 date_default_timezone_set('Asia/Kuala_Lumpur');
@@ -41,8 +42,6 @@ $minDateTime = date('Y-m-d\TH:i'); // Format required for datetime-local
 ?>
 <?php
 session_start();
-
-
 
 // ✅ Your Pixazo API Key
 $pixazoApiKey = "17c0f129d252488eb099ad0f16da85d0";
@@ -91,7 +90,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax_generate_image"]
 
     $decoded = json_decode($result, true);
 
-    // 🔹 Proper JSON response for JS
     if ($httpCode === 200 && isset($decoded['imageUrl'])) {
         echo json_encode([
             "success" => true,
@@ -107,6 +105,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax_generate_image"]
 
     exit;
 }
+
 // ===========================
 // 1️⃣ Check API token
 // ===========================
@@ -118,14 +117,37 @@ $responseMessage = "";
 // 🔹 Function: Upload Media
 // ===========================
 function uploadMediaToSocialBu($filePath, $token) {
-    if (!file_exists($filePath)) return ["error" => "File not found: $filePath"];
+
+    echo "<pre>==== STEP 1: FILE VALIDATION ====\n";
+
+    if (!file_exists($filePath)) {
+        echo "File does NOT exist: $filePath\n</pre>";
+        return ["error" => "File not found: $filePath"];
+    }
+
+    echo "File exists: $filePath\n";
 
     $fileName = basename($filePath);
     $mimeType = mime_content_type($filePath);
+    $fileSize = filesize($filePath);
 
-    // Step 1: Request signed URL
-    $payload = json_encode(["name" => $fileName, "mime_type" => $mimeType]);
+    echo "Filename: $fileName\n";
+    echo "Mime type: $mimeType\n";
+    echo "File size: $fileSize bytes\n";
+
+
+
+    echo "\n==== STEP 2: REQUEST SIGNED URL ====\n";
+
+    $payload = json_encode([
+        "name" => $fileName,
+        "mime_type" => $mimeType
+    ]);
+
+    echo "Payload sent:\n$payload\n";
+
     $ch = curl_init("https://socialbu.com/api/v1/upload_media");
+
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => [
@@ -135,71 +157,139 @@ function uploadMediaToSocialBu($filePath, $token) {
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload
     ]);
+
     $resp = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
-    if ($httpCode !== 200) return ["error" => "Failed to get signed URL. HTTP $httpCode: $resp"];
+    echo "HTTP Code: $httpCode\n";
+    echo "cURL Error: $curlError\n";
+    echo "Response:\n$resp\n";
+
+    if ($httpCode !== 200) {
+        echo "</pre>";
+        return ["error" => "Failed to get signed URL. HTTP $httpCode: $resp"];
+    }
+
+
+
+    echo "\n==== STEP 3: PARSE SIGNED URL ====\n";
 
     $data = json_decode($resp, true);
-    if (empty($data['signed_url']) || empty($data['key'])) return ["error" => "Invalid response: $resp"];
+
+    if (!$data) {
+        echo "JSON decode failed\n</pre>";
+        return ["error" => "Invalid JSON response"];
+    }
+
+    print_r($data);
+
+    if (empty($data['signed_url']) || empty($data['key'])) {
+        echo "Missing signed_url or key\n</pre>";
+        return ["error" => "Invalid response: $resp"];
+    }
 
     $signedUrl = $data['signed_url'];
     $key = $data['key'];
 
-    // Step 2: Upload file via PUT
-    $parsed = parse_url($signedUrl);
-    parse_str($parsed['query'] ?? '', $query);
-    $signedHeaders = explode(';', $query['X-Amz-SignedHeaders'] ?? '');
-    $headersToSend = ["Content-Type: $mimeType", "Expect:"];
-    foreach ($signedHeaders as $h) {
-        if ($h === 'x-amz-acl') $headersToSend[] = "x-amz-acl: private";
-    }
+    echo "Signed URL:\n$signedUrl\n";
+    echo "Key:\n$key\n";
 
-    $fp = fopen($filePath, 'rb');
+
+
+    echo "\n==== STEP 4: UPLOAD FILE TO SIGNED URL ====\n";
+
+    $fileData = file_get_contents($filePath);
+
     $ch = curl_init($signedUrl);
+
     curl_setopt_array($ch, [
-        CURLOPT_PUT => true,
-        CURLOPT_INFILE => $fp,
-        CURLOPT_INFILESIZE => filesize($filePath),
+        CURLOPT_CUSTOMREQUEST => "PUT",
+        CURLOPT_POSTFIELDS => $fileData,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headersToSend,
-        CURLOPT_VERBOSE => true
+        CURLOPT_HTTPHEADER => [
+            "x-amz-acl: private",
+            "Content-Type: $mimeType",
+            "Content-Length: " . strlen($fileData)
+        ]
     ]);
+
     $uploadResp = curl_exec($ch);
     $info = curl_getinfo($ch);
     $error = curl_error($ch);
+
     curl_close($ch);
-    fclose($fp);
+    echo "Upload HTTP Code: {$info['http_code']}\n";
+    echo "Upload cURL Error: $error\n";
+    echo "Upload Response:\n$uploadResp\n";
 
     if (!in_array($info['http_code'], [200, 201])) {
-        return ["error" => "Upload failed. HTTP {$info['http_code']}. cURL error: $error", "response" => $uploadResp];
+        echo "</pre>";
+        return [
+            "error" => "Upload failed. HTTP {$info['http_code']}. cURL error: $error",
+            "response" => $uploadResp
+        ];
     }
 
-    // Step 3: Verify upload status
+
+
+    echo "\n==== STEP 5: VERIFY UPLOAD STATUS ====\n";
+
     $attempts = 0;
     $uploadToken = null;
+
     while ($attempts < 5 && !$uploadToken) {
-        $ch = curl_init("https://socialbu.com/api/v1/upload_media/status?key=" . urlencode($key));
+
+        echo "Attempt #" . ($attempts + 1) . "\n";
+
+        $statusUrl = "https://socialbu.com/api/v1/upload_media/status?key=" . urlencode($key);
+
+        echo "Status URL: $statusUrl\n";
+
+        $ch = curl_init($statusUrl);
+
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ["Authorization: Bearer $token"]
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer $token"
+            ]
         ]);
+
         $statusResp = curl_exec($ch);
+        $statusError = curl_error($ch);
         curl_close($ch);
 
+        echo "Status cURL Error: $statusError\n";
+        echo "Status Response:\n$statusResp\n";
+
         $statusData = json_decode($statusResp, true);
+
         if (!empty($statusData['upload_token'])) {
             $uploadToken = $statusData['upload_token'];
+            echo "Upload token received: $uploadToken\n";
             break;
         }
+
         $attempts++;
         sleep(2);
     }
 
-    if (!$uploadToken) return ["error" => "Upload verification failed", "response" => $statusResp];
+    echo "\n==== FINAL RESULT ====\n";
 
-    return ["success" => true, "upload_token" => $uploadToken];
+    if (!$uploadToken) {
+        echo "Upload verification failed\n</pre>";
+        return ["error" => "Upload verification failed", "response" => $statusResp];
+    }
+
+    echo "SUCCESS\n";
+    echo "Upload Token: $uploadToken\n";
+    echo "</pre>";
+
+    return [
+        "success" => true,
+        "upload_token" => $uploadToken
+    ];
 }
 
 // ===========================
@@ -223,66 +313,53 @@ if ($httpcode !== 200) {
 }
 
 // ===========================
-// 🔹 Step 2: Handle Post Submission
+// 🔹 Step 2: Handle Post Update
 // ===========================
+$postId = $_GET['id'] ?? null;
+if (!$postId) die("❌ No post ID provided.");
+
+// Only proceed for form submission (excluding AI AJAX)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"])) {
+
+    $isDraftChecked = isset($_POST['draft']) ? true : false; // true if checked, false if not
     $accounts_selected = isset($_POST['accounts']) ? array_map('intval', $_POST['accounts']) : [];
     $content = trim($_POST['content'] ?? '');
     $upload_tokens = [];
 
     // ===========================
-    // 🔹 2️⃣ Handle Uploaded Files (User file upload)
+    // 🔹 Handle Uploaded Files
     // ===========================
     if (!empty($_FILES['media']['name'][0])) {
-
         foreach ($_FILES['media']['tmp_name'] as $key => $tmpPath) {
-
             if ($_FILES['media']['error'][$key] === UPLOAD_ERR_OK) {
-
                 $result = uploadMediaToSocialBu($tmpPath, $token);
-
                 if (!empty($result['success'])) {
                     $upload_tokens[] = $result['upload_token'];
+                } else {
+                    error_log("Failed to upload library image $img: " . json_encode($result));
                 }
             }
         }
     }
 
     // ===========================
-    // 🔹 3️⃣ Handle Library Images (Unsplash + AI generated)
+    // 🔹 Handle Library Images
     // ===========================
     if (!empty($_POST['library_images'])) {
-
         $images = json_decode($_POST['library_images'], true);
-
         if (is_array($images)) {
-
             foreach ($images as $img) {
-
-                // If it is a local AI generated image
                 if (file_exists($img)) {
-
                     $result = uploadMediaToSocialBu($img, $token);
-
                 } else {
-
-                    // Otherwise treat it as a URL (Unsplash)
                     $imageData = @file_get_contents($img);
-
                     if ($imageData !== false) {
-
                         $tempFile = tempnam(sys_get_temp_dir(), 'lib_');
                         file_put_contents($tempFile, $imageData);
-
                         $result = uploadMediaToSocialBu($tempFile, $token);
-
                         unlink($tempFile);
-
-                    } else {
-                        continue;
-                    }
+                    } else continue;
                 }
-
                 if (!empty($result['success'])) {
                     $upload_tokens[] = $result['upload_token'];
                 }
@@ -290,13 +367,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
         }
     }
 
-    // 🔹 3️⃣ Validate
-    if (empty($accounts_selected)) {
-        $responseMessage .= "<div class='alert alert-warning'>⚠️ Please select at least one account.</div>";
-    } elseif (empty($content)) {
+    // ===========================
+    // 🔹 Validation
+    // ===========================
+    if (empty($content)) {
         $responseMessage .= "<div class='alert alert-warning'>⚠️ Post content cannot be empty.</div>";
     } else {
-        // Convert Malaysia time to UTC
+        // Convert Malaysia time → UTC
         $publish_at_input = trim($_POST['publish_at'] ?? '');
         if (!empty($publish_at_input)) {
             try {
@@ -309,44 +386,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
         } else {
             $publish_at = gmdate("Y-m-d H:i:s");
         }
+        
+       // Grab existing attachments from submitted form
+        $existingTokens = $_POST['existing_attachments'] ?? [];
 
-        // 🔹 4️⃣ Create Post
-        $attachments = array_map(fn($t) => ["upload_token" => $t], $upload_tokens);
+        // Convert to SocialBu payload format
+        $existingAttachmentsPayload = array_map(function($token){
+            return ["upload_token" => $token];
+        }, $existingTokens);
+
+        // Add newly uploaded files
+        $newAttachmentsPayload = array_map(function($token){
+            return ["upload_token" => $token];
+        }, $upload_tokens);
+
+        // Merge them
+        $allAttachmentsPayload = array_merge($existingAttachmentsPayload, $newAttachmentsPayload);
+
+        // Build payload
         $payload = [
             "accounts" => $accounts_selected,
-            "publish_at" => $publish_at,
             "content" => $content,
-            "draft" => isset($_POST['draft']),
-            "existing_attachments" => $attachments,
-            "options" => new stdClass(),
-            "postback_url" => "",
-            "queue_ids" => [],
-            "team_id" => 0
+            "publish_at" => $publish_at,
+            "draft" => $isDraftChecked,
+            "team_id" => 0,
+            "options" => new stdClass()
         ];
-
         $json_payload = json_encode($payload, JSON_PRETTY_PRINT);
-        $ch = curl_init("https://socialbu.com/api/v1/posts");
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $token,
-                'Accept: application/json',
-                'Content-Type: application/json'
-            ],
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $json_payload
-        ]);
-        $response = curl_exec($ch);
-        $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
-        curl_close($ch);
 
+        // PATCH request to update post
+// -----------------------------
+// DEBUG: Show payload and headers
+// -----------------------------
+
+$headers = [
+    'Authorization: Bearer ' . $token,
+    'Accept: application/json',
+    'Content-Type: application/json'
+];
+
+// PATCH request
+$ch = curl_init("https://socialbu.com/api/v1/posts/$postId");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CUSTOMREQUEST => "PATCH",
+    CURLOPT_HTTPHEADER => $headers,
+    CURLOPT_POSTFIELDS => $json_payload
+]);
+$response = curl_exec($ch);
+$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+
+curl_close($ch);
         if ($httpcode >= 200 && $httpcode < 300) {
 
             $responseMessage .= '
             <div class="alert alert-success alert-dismissible fade show mt-3" role="alert" style="margin:0 !important;border:none !important;outline:none !important;color:#668f6c;">
                 <i class="fas fa-check-circle" style="margin-right:10px;"></i>
-                <b>Post created successfully!</b>
+                <b>Post updated successfully!</b>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" style="background-color:transparent !important;"></button>
             </div>';
 
@@ -355,21 +452,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
             $responseMessage .= '
             <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert" style="margin:0 !important;border:none !important;outline:none !important;color:#683636;">
                 <i class="fas fa-times-circle" style="margin-right:10px;"></i>
-                <b>Failed to create post. Please try again.</b>
+                <b>Failed to update post. Please try again.</b>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" style="background-color:transparent !important;"></button>
             </div>';
 
         }
     }
-}
 
+    // Redirect if post was published (not a draft)
+    if ($httpcode === 200 && !$isDraftChecked) {
+        header("Location: post-all.php");
+        exit;
+    }
+
+}
+?>
+<?php
+    // ===========================
+    // Timezone settings
+    // ===========================
+    date_default_timezone_set('Asia/Kuala_Lumpur');
+
+    // Minimum selectable datetime (cannot pick past)
+    $minDateTime = date('Y-m-d\TH:i'); // format required by datetime-local
+
+    // Helper: Convert UTC → Malaysia time for input
+    function utcToMalaysiaInput($utcTime) {
+        if (empty($utcTime)) return '';
+        $dt = new DateTime($utcTime, new DateTimeZone('UTC')); // assume UTC from API
+        $dt->setTimezone(new DateTimeZone('Asia/Kuala_Lumpur')); // convert to Malaysia time
+        return $dt->format('Y-m-d\TH:i'); // format for datetime-local
+    }
+
+    $postId = $_GET['id'] ?? null;
+    if (!$postId) die("Post ID missing.");
+
+    // Fetch the post details
+    $ch = curl_init("https://socialbu.com/api/v1/posts/$postId");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            "Authorization: Bearer $token",
+            "Accept: application/json"
+        ]
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200) die("Failed to fetch post details. HTTP code: $httpCode");
+
+    $post = json_decode($response, true);
+
+    // Sanitize and set defaults
+    $postContent = htmlspecialchars($post['content'] ?? '');
+    $selectedAccounts = $post['account_ids'] ?? [$post['account_id'] ?? ''];
+    $attachments = $post['attachments'] ?? [];
+    $publishAt = !empty($post['publish_at']) ? utcToMalaysiaInput($post['publish_at']) : '';
+    $isDraft = !empty($post['draft']);
+    $aiOutput = htmlspecialchars($post['ai_output'] ?? '');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Create Post | New Post</title>
+<title>Create Post | Edit Draft</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/all.min.css">
 <link href="https://fonts.googleapis.com/css?family=Lato|Poppins&display=swap" rel="stylesheet">
@@ -676,6 +824,10 @@ label{
     filter: brightness(50%);
 }
 
+.account-item input {
+    cursor: pointer;
+}
+
 </style>
 </head>
 <body>
@@ -684,7 +836,7 @@ label{
         <?php include 'sidebar.php'; ?>
         <div style="width:100%;">
             <div class="py-3 px-3 d-flex justify-content-between align-items-center" style="background-color:white;">
-                <h1 class="mb-0">New Post</h1>
+                <h1 class="mb-0">Edit Draft</h1>
                 <div class="dropdown">
                     <button class="btn dropdown-toggle signout" type="button" data-bs-toggle="dropdown"
                         style="background:none;color:#312b2f !important;font-weight:bold;margin:0!important;">
@@ -710,50 +862,57 @@ label{
                         <div class="newpost container container-fluid" id="newpost">
                             <div style="display: flex; justify-content: center;" class="container">
                             <div style="width: 53%; margin: 0px 20px 15px 10px; color: #44424d;">
-                                <a href="dashboard.php">Posts</a> > <a href="post-all.php">Post List</a> > <a style="color: #04a3ce !important; font-weight: bold;">New Post</a>
+                                <a href="dashboard.php">Posts</a> > <a href="post-all.php">Post List</a> > <a style="color: #04a3ce !important; font-weight: bold;">Edit Draft</a>
                             </div>
                             <div style="width: 35%; margin: 0px 10px;"></div>
                         </div>
                             <div style="display: flex; justify-content: center;">
                                 <div class="ui-container">
-                                    <h2 style="color: #312b2f; font-size: 24px;">Create a New Post <i class="fas fa-pen" style="padding-left: 7px; font-size: 21px;"></i></h2>
+                                    <h2 style="color: #312b2f; font-size: 24px;">Edit Draft <i class="fas fa-pen" style="padding-left: 7px; font-size: 21px;"></i></h2>
                                     <hr style="margin: 10px 0px 7px 0px;">
                                     <div class="accounts mt-3">
                                         <div class="mb-3">
-                                            <label class="form-label">Select Accounts</label>
+                                            <label class="form-label">Selected Account</label>
                                             <div class="account-list">
-                                                <?php if (!empty($accounts)): ?>
-                                                <?php foreach ($accounts as $acc): ?>
-                                                    <label class="account-item">
-                                                        <div style="justify-content: space-between;display: flex;">
-                                                            <img src="<?= htmlspecialchars($acc['image']) ?>" alt="icon">
+                                                <?php if (!empty($accounts) && !empty($selectedAccounts)): ?>
+                                                    <?php 
+                                                    // Ensure selectedAccounts is an array of integers
+                                                    $selectedAccounts = array_map('intval', $selectedAccounts);  
+                                                    ?>
+                                                    <?php foreach ($accounts as $acc): 
+                                                        $accId = intval($acc['id']); 
+                                                        
+                                                        // Only show if account is selected
+                                                        if (!in_array($accId, $selectedAccounts)) continue;
 
-                                                            <span class="account-info">
-                                                                <?php if (!empty($acc['name'])): ?>
-                                                                    <div><strong><?= htmlspecialchars($acc['name']) ?></strong></div>
-                                                                    <small><?= htmlspecialchars($acc['_type']) ?></small>
-                                                                <?php else: ?>
-                                                                    <small><?= htmlspecialchars($acc['_type']) ?></small>
-                                                                <?php endif; ?>
-                                                            </span>
-                                                        </div>
-
-                                                        <input type="checkbox" name="accounts[]" value="<?= htmlspecialchars($acc['id']) ?>" class="account-checkbox">
-
-                                                    </label>
-                                                <?php endforeach; ?>
+                                                        $isChecked = 'checked';
+                                                    ?>
+                                                        <label class="account-item">
+                                                            <div style="justify-content: space-between; display: flex;">
+                                                                <img src="<?= htmlspecialchars($acc['image']) ?>" alt="icon" style="width:40px; height:40px; object-fit:cover;">
+                                                                <span class="account-info">
+                                                                    <?php if (!empty($acc['name'])): ?>
+                                                                        <div><strong><?= htmlspecialchars($acc['name']) ?></strong></div>
+                                                                        <small><?= htmlspecialchars($acc['_type']) ?></small>
+                                                                    <?php else: ?>
+                                                                        <small><?= htmlspecialchars($acc['_type']) ?></small>
+                                                                    <?php endif; ?>
+                                                                </span>
+                                                            </div>
+                                                            <!-- Checkbox is checked and disabled -->
+                                                            <input type="checkbox" class="account-checkbox" name="accounts[]" value="<?= $accId ?>" <?= $isChecked ?> disabled>
+                                                        </label>
+                                                    <?php endforeach; ?>
                                                 <?php else: ?>
-                                                <p class="text-muted">No connected accounts found or error fetching accounts.</p>
+                                                    <p class="text-muted">No connected accounts found or no account selected for this post.</p>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-
                                         <div class="mb-3">
                                             <label class="form-label">Post Content</label>
-                                            <textarea style="height: 160px;" class="form-control" id="postContent" name="content" rows="4" placeholder="Write your post here..." required></textarea>
+                                            <textarea style="height: 160px;" class="form-control" id="postContent" name="content" rows="4" placeholder="Write your post here..." required><?= $postContent ?></textarea>
                                         </div>
-                                        
-                                        <input type="hidden" id="library_images" name="library_images">
+                                        <input type="hidden" id="library_images" name="library_images" value='[]'>
 
                                         <div class="mb-3">
                                         <label class="form-label">Attach Images</label>
@@ -768,8 +927,26 @@ label{
                                         <!-- File upload -->
                                         <input type="file" class="form-control" name="media[]" multiple accept="image/*">
 
-                                        <!-- Preview -->
-                                        <div id="previewContainer" class="d-flex gap-2 flex-wrap mt-2"></div>
+                                        <!-- Preview Container -->
+                                        <div id="previewContainer" class="d-flex gap-2 flex-wrap mt-2">
+                                            <?php if (!empty($attachments) && is_array($attachments)): ?>
+                                                <?php foreach ($attachments as $att): ?>
+                                                    <?php if (!empty($att['url'])): ?>
+                                                        <div class="preview-wrapper" style="width:100px; height:100px;">
+                                                            <img src="<?= htmlspecialchars($att['url']) ?>" 
+                                                                alt="<?= htmlspecialchars($att['name'] ?? 'attachment') ?>" 
+                                                                class="img-thumbnail w-100 h-100" 
+                                                                style="object-fit: cover; padding: 0px !important;">
+                                                            <!-- Optional: hidden input for UI reference, won't be submitted -->
+                                                            <input type="hidden" name="existing_attachments_ui[]" 
+                                                                value="<?= htmlspecialchars($att['url']) ?>">
+                                                        </div>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <p class="text-muted">No attachments available.</p>
+                                            <?php endif; ?>
+                                        </div>
 
                                         <small class="text-muted">
                                             You can upload files or select from Unsplash.
@@ -777,16 +954,17 @@ label{
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Publish At (Malaysia Time)</label>
-                                        <input type="datetime-local" class="form-control" name="publish_at" min="<?= $minDateTime ?>">
+                                        <input type="datetime-local" class="form-control" name="publish_at"
+                                            min="<?= $minDateTime ?>" value="<?= $publishAt ?>">
                                         <small class="text-muted">Leave empty to publish immediately.</small>
-                                        </div>
+                                    </div>
 
-                                        <div class="form-check mb-3" style="padding-left: 0px; display: flex;">
-                                        <input type="checkbox" name="draft" id="draft" style="width: 20px; height: 20px; margin-right: 10px;">
+                                    <div class="form-check mb-3" style="padding-left: 0px; display: flex;">
+                                        <input type="checkbox" name="draft" id="draft" style="width: 20px; height: 20px; margin-right: 10px;" <?= $isDraft ? 'checked' : '' ?>>
                                         <label for="draft" class="form-check-label" style="margin-top: -4px; font-size: 18px;">Save as Draft</label>
-                                        </div>
+                                    </div>
 
-                                        <button type="submit" class="btn btn-primary w-100">Create Post</button>
+                                    <button type="submit" id="submitBtn" class="btn btn-primary w-100"><?= $isDraft ? 'Update Draft' : 'Create Post' ?></button>
                                     </div>
                                 </div>
                                 <div class="ui-container second" style="width: 35% !important;">
@@ -811,7 +989,7 @@ label{
                                         </div>
 
                                         <!-- ✅ Separate AI output -->
-                                        <textarea class="form-control mt-3" id="aiOutput" name="ai_output" rows="4" placeholder="AI rewrite will appear here..."></textarea>
+                                        <textarea class="form-control mt-3" id="aiOutput" name="ai_output" rows="4" placeholder="AI rewrite will appear here..."><?= $aiOutput ?></textarea>
                                         <div id="aiMessage" class="mt-2"></div>
                                     </div>  
 
@@ -1161,22 +1339,6 @@ document.getElementById('unsplashModal').addEventListener('shown.bs.modal', () =
     }
 });
 
-document.querySelector("form").addEventListener("submit", function(e) {
-
-    const checkedAccounts = document.querySelectorAll('.account-checkbox:checked');
-
-    if (checkedAccounts.length === 0) {
-        e.preventDefault(); // stop form submission
-        alert("⚠️ Please select at least one account before creating the post.");
-
-        // scroll to the accounts section
-        document.querySelector(".account-list").scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-    }
-
-});
 </script>
 
 
@@ -1301,6 +1463,76 @@ document.getElementById("generateAIImage").addEventListener("click", async funct
         console.error(err);
         messageBox.innerHTML = `<span class='text-danger'>❌ Error: ${err.message}</span>`;
     }
+});
+
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // ------------------------------
+    // 1️⃣ Original post accounts
+    // ------------------------------
+    const postAccounts = <?= json_encode($post['accounts'] ?? []) ?>; // e.g., [171315, 171331]
+    let newAccounts = [];
+
+    // ------------------------------
+    // 2️⃣ Tick original accounts and add active class
+    // ------------------------------
+    document.querySelectorAll('.account-checkbox').forEach(cb => {
+        const accountId = parseInt(cb.value);
+        if (postAccounts.includes(accountId)) {
+            cb.checked = true;
+            cb.closest('.account-item').classList.add('active');
+        }
+    });
+
+    // ------------------------------
+    // 3️⃣ Handle checkbox changes
+    // ------------------------------
+    document.querySelectorAll('.account-checkbox').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const parent = cb.closest('.account-item');
+            parent.classList.toggle('active', cb.checked);
+
+            const accountId = parseInt(cb.value);
+
+            // Track new accounts
+            if (!postAccounts.includes(accountId)) {
+                if (cb.checked && !newAccounts.includes(accountId)) {
+                    newAccounts.push(accountId);
+                } else if (!cb.checked && newAccounts.includes(accountId)) {
+                    newAccounts = newAccounts.filter(id => id !== accountId);
+                }
+            }
+        });
+    });
+
+    // ------------------------------
+    // 4️⃣ Optional: debug current selection
+    // ------------------------------
+    const debugContainer = document.getElementById('accountDebug');
+    if (debugContainer) {
+        document.querySelectorAll('.account-checkbox').forEach(cb => {
+            cb.addEventListener('change', () => {
+                debugContainer.innerText = `
+Original accounts: ${postAccounts.join(', ')}
+New accounts: ${newAccounts.join(', ')}
+All selected: ${[...document.querySelectorAll('.account-checkbox:checked')].map(c => c.value).join(', ')}
+                `;
+            });
+        });
+    }
+});
+</script>
+
+<script>
+// Grab elements
+const draftCheckbox = document.getElementById('draft');
+const submitBtn = document.getElementById('submitBtn');
+
+// Update button text on checkbox change
+draftCheckbox.addEventListener('change', function() {
+    submitBtn.textContent = this.checked ? 'Update Draft' : 'Create Post';
 });
 </script>
 <!-- Debug container somewhere below the AI input -->

@@ -205,47 +205,61 @@ pre { background: #04a3ce; color: white; padding: 0px; border-radius: 0px; margi
             ?>
             <div style="width:100%;">
                 <pre id="output"></pre>
-                <div class="py-3 px-3" style="background-color: white; margin-bottom: 20px;">
-                    <h1>Dashboard</h1>
+                <div class="py-3 px-3 d-flex justify-content-between align-items-center" style="background-color:white; margin-bottom:20px;">
+                    <h1 class="mb-0">Dashboard</h1>
+                    <div class="dropdown">
+                        <button class="btn dropdown-toggle signout" type="button" data-bs-toggle="dropdown"
+                            style="background:none;color:#312b2f;font-weight:bold;margin:0!important;">
+                            <i class="fas fa-user" style="padding-right:6px;"></i>
+                            <?= htmlspecialchars($_SESSION['user_email'] ?? 'Account') ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item text-danger signout_dropdown" href="logout.php">
+                                    <i class="fas fa-sign-out-alt me-2"></i> <b>Logout</b>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="d-flex">
-  <div class="dashboard container container-fluid" id="dashboard">
-    <div class="ui-container">
-      <h2>Your Connected Accounts</h2>
+                    <div class="dashboard container container-fluid" id="dashboard">
+                        <div class="ui-container">
+                        <h2>Your Connected Accounts</h2>
 
-      <!-- Add Account Button -->
-      <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#addAccountModal">
-        ➕ Add Account
-      </button>
+                        <!-- Add Account Button -->
+                        <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#addAccountModal">
+                            ➕ Add Account
+                        </button>
 
-      <!-- Accounts Grid -->
-      <div id="accounts" class="mt-4"></div>
-    </div>
-  </div>
-</div>
+                        <!-- Accounts Grid -->
+                        <div id="accounts" class="mt-4"></div>
+                        </div>
+                    </div>
+                    </div>
 
-<!-- 🌟 Floating Modal Window -->
-<div class="modal fade" id="addAccountModal" tabindex="-1" aria-labelledby="addAccountModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content shadow-lg border-0 rounded-4">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title" id="addAccountModalLabel">Connect a New Account</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body text-center p-4">
-        <p>Select a platform to connect:</p>
-        <div class="d-grid gap-3">
-          <div class="d-grid gap-3">
-            <button class="btn btn-outline-danger" onclick="connectProvider('instagram')">📸 Instagram</button>
-            <button class="btn btn-outline-info" onclick="connectProvider('twitter')">🐦 Twitter</button>
-            <button class="btn btn-outline-primary" onclick="connectProvider('facebook')">📘 Facebook</button>
-            <button class="btn btn-outline-secondary" onclick="connectProvider('linkedin')">💼 LinkedIn</button>
-            <button class="btn btn-outline-dark" onclick="connectProvider('mastodon')">🦣 Mastodon</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+                    <!-- 🌟 Floating Modal Window -->
+                    <div class="modal fade" id="addAccountModal" tabindex="-1" aria-labelledby="addAccountModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content shadow-lg border-0 rounded-4">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title" id="addAccountModalLabel">Connect a New Account</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-center p-4">
+                            <p>Select a platform to connect:</p>
+                            <div class="d-grid gap-3">
+                            <div class="d-grid gap-3">
+                                <button class="btn btn-outline-danger" onclick="connectProvider('instagram')">📸 Instagram</button>
+                                <button class="btn btn-outline-info" onclick="connectProvider('twitter')">🐦 Twitter</button>
+                                <button class="btn btn-outline-primary" onclick="connectProvider('facebook')">📘 Facebook</button>
+                                <button class="btn btn-outline-secondary" onclick="connectProvider('linkedin')">💼 LinkedIn</button>
+                                <button class="btn btn-outline-dark" onclick="connectProvider('mastodon')">🦣 Mastodon</button>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
 
             </div>
         </div>
