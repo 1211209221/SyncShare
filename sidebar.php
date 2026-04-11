@@ -307,8 +307,13 @@
 			<a class="navbar-brand" href="dashboard.php">Sync<b>Share</b></a>
 			<ul class="nav nav-pills flex-column mb-auto">
 				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'dashboard.php'): ?> active <?php endif; ?>" href="dashboard.php">
+						<i class="fas fa-columns"></i> Dashboard
+					</a>
+				</li>
+				<li class="nav-item">
 					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'account-all.php'): ?> active <?php endif; ?>" href="account-all.php">
-						<i class="fas fa-users me-2"></i> Dashboard
+						<i class="fas fa-users me-2"></i> Accounts
 					</a>
 				</li>
 				<li class="nav-item">
@@ -322,7 +327,12 @@
 				</li>
 				<li class="nav-item">
 					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'post-calendar.php'): ?> active <?php endif; ?>" href="post-calendar.php">
-						<i class="fas fa-users me-2"></i> Content Calendar
+						<i class="fas fa-calendar-alt"></i> Content Calendar
+					</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'account-analytics.php'): ?> active <?php endif; ?>" href="account-analytics.php">
+						<i class="fas fa-chart-line"></i> Account Analytics
 					</a>
 				</li>
 			</ul>

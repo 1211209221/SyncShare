@@ -160,6 +160,7 @@ $query = http_build_query([
     "end"       => $end
 ]);
 
+
 $metricsUrl = "https://socialbu.com/api/v1/insights/posts/metrics?$query";
 
 
@@ -172,7 +173,9 @@ list($metricsCode, $metricsResponse) =
 
 $metricsData = json_decode($metricsResponse, true);
 
-
+echo "<pre>";
+echo htmlspecialchars($metricsResponse);
+echo "</pre>";
 /* =====================================================
    FETCH ACCOUNT INFO
 ===================================================== */
@@ -909,111 +912,194 @@ a.btn-outline-secondary:hover{
                                         </h2>
                                         <hr style="margin: 10px 0px 7px 0px;">
                                         <div class="accounts mt-3">
-                                            <div class="post-card d-flex justify-content-between align-items-start" style="position: relative;">
 
-                                                <?php
-                                                $postContent = htmlspecialchars($post['content'] ?? '[No content]');
-                                                $publishAt   = utcToMalaysia($post['publish_at'] ?? '');
-                                                $createdAt   = utcToMalaysia($post['created_at'] ?? '');
-                                                $accountId   = $post['account_id'] ?? '';
+                                        <?php if (!empty($post)): ?>
 
-                                                $accountPfp  = $accountImage ?? 'assets/default-avatar.png';
-                                                $accountName = $accountName ?? 'Unknown Account';
+                                            <?php
+                                            $url = $post['permalink'] ?? '';
+                                            $status = strtolower($postStatus ?? 'unknown');
 
-                                                $platformColors = [
-                                                    'twitter'   => '#42a1dd',
-                                                    'mastodon'  => '#6565c8',
-                                                    'facebook'  => '#5883bb',
-                                                    'instagram' => '#c75078',
-                                                    'linkedin'  => '#2789bd'
-                                                ];
+                                            $isMastodon = preg_match('/https?:\/\/[^\/]+\/@[^\/]+\/\d+/', $url);
 
-                                                $platformColor = $platformColors[$platform] ?? '#9a97a7';
-                                                ?>
-                                                <div class="post-info" style="flex:1; padding-right:15px;">
+                                            function quickFetch($url) {
+                                                $ch = curl_init($url);
+                                                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                                                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                                                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                                                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                                                    "User-Agent: Mozilla/5.0"
+                                                ]);
+                                                $res = curl_exec($ch);
+                                                curl_close($ch);
+                                                return json_decode($res, true);
+                                            }
+                                            ?>
+<!-- 📝 SCHEDULED -->
+                                                <?php if ($status === 'scheduled'): ?>
 
-                                                    <div class="post-header mb-2">
+                                                <div class="post-card d-flex justify-content-between align-items-start" style="position: relative;">
+
+                                                    <?php
+                                                    $postContent = htmlspecialchars($post['content'] ?? '[No content]');
+                                                    $publishAt   = utcToMalaysia($post['publish_at'] ?? '');
+                                                    $createdAt   = utcToMalaysia($post['created_at'] ?? '');
+                                                    $accountId   = $post['account_id'] ?? '';
+
+                                                    $accountPfp  = $accountImage ?? 'assets/default-avatar.png';
+                                                    $accountName = $accountName ?? 'Unknown Account';
+
+                                                    $platformColors = [
+                                                        'twitter'   => '#42a1dd',
+                                                        'mastodon'  => '#6565c8',
+                                                        'facebook'  => '#5883bb',
+                                                        'instagram' => '#c75078',
+                                                        'linkedin'  => '#2789bd'
+                                                    ];
+
+                                                    $platformColor = $platformColors[$platform] ?? '#9a97a7';
+                                                    ?>
+
+                                                    <!-- LEFT -->
+                                                    <div class="post-info" style="flex:1; padding-right:15px;">
+
                                                         <div class="d-flex align-items-center mb-2">
-                                                            <img src="<?= $accountPfp ?>" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-right:10px; border:1px solid #ddd;">
+                                                            <img src="<?= $accountPfp ?>"
+                                                                style="width:50px;height:50px;border-radius:50%;margin-right:10px;border:1px solid #ddd;">
+
                                                             <div>
-                                                                <div style="font-weight:600; font-size:16px; color:#312b2f;">
+                                                                <div style="font-weight:600;color:#312b2f;">
                                                                     <?= htmlspecialchars($accountName) ?>
                                                                 </div>
+
                                                                 <div class="d-flex gap-2">
-                                                                    <span style="background:#fff; color:<?= $platformColor ?>; padding:2px 8px; border-radius:4px; font-size:.85rem; border:2px solid <?= $platformColor ?> !important;">
+                                                                    <span style="background:#fff;color:<?= $platformColor ?>;
+                                                                                padding:2px 8px;border-radius:4px;border:2px solid <?= $platformColor ?>;">
                                                                         <?= ucfirst($platform) ?>
                                                                     </span>
-                                                                    <span style="background:<?= $statusColor ?>; color:<?= $textColor ?>; padding:2px 8px; border-radius:4px; font-size:.85rem; border:2px solid <?= $statusColor ?> !important;">
+
+                                                                    <span style="background:<?= $statusColor ?>;color:<?= $textColor ?>;
+                                                                                padding:2px 8px;border-radius:4px;border:2px solid <?= $statusColor ?>;">
                                                                         <?= $statusLabel ?>
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                         </div>
+
+                                                        <strong style="display:block;margin-bottom:30px;">
+                                                            <?= nl2br($postContent) ?>
+                                                        </strong>
+
+                                                        <small style="position:absolute;bottom:15px;left:15px;">
+                                                            <i class="fas fa-clock"></i>
+                                                            <b><?= $publishAt ?></b>
+                                                        </small>
                                                     </div>
 
-                                                    <strong style="color:#312b2f; font-size:17px; display:block; margin-bottom:40px;">
-                                                        <?= nl2br($postContent) ?>
-                                                    </strong>
+                                                    <!-- RIGHT (IMAGES) -->
+                                                    <?php
+                                                    $validImages = [];
 
-                                                    <small class="small-muted" style="position:absolute; bottom:15px; left:15px;">
-                                                        <i class="fas fa-clock"></i>
-                                                        <b><?= $publishAt ?></b>
-                                                    </small>
-                                                </div>
-
-                                                <?php
-                                                $validImages = [];
-
-                                                if (!empty($post['attachments'])) {
-                                                    foreach ($post['attachments'] as $att) {
-                                                        if (!empty($att['url'])) {
-                                                            $validImages[] = $att['url'];
+                                                    if (!empty($post['attachments'])) {
+                                                        foreach ($post['attachments'] as $att) {
+                                                            if (!empty($att['url'])) {
+                                                                $validImages[] = $att['url'];
+                                                            }
                                                         }
                                                     }
-                                                }
 
-                                                $imageCount = count($validImages);
+                                                    $imageCount = count($validImages);
 
-                                                $gridClass =
-                                                    $imageCount === 1
-                                                        ? 'single'
-                                                        : ($imageCount > 1 ? 'multiple' : '');
-                                                ?>
-                                                <div class="post-images <?= $gridClass ?>">
-                                                    <?php if ($imageCount > 0): ?>
-                                                        <?php foreach ($validImages as $url): ?>
-                                                            <div>
-                                                                <img src="<?= htmlspecialchars($url) ?>">
+                                                    $gridClass = $imageCount === 1 ? 'single' : ($imageCount > 1 ? 'multiple' : '');
+                                                    ?>
+
+                                                    <div class="post-images <?= $gridClass ?>">
+
+                                                        <?php if ($imageCount > 0): ?>
+                                                            <?php foreach ($validImages as $imgUrl): ?>
+                                                                <div>
+                                                                    <img src="<?= htmlspecialchars($imgUrl) ?>">
+                                                                </div>
+                                                            <?php endforeach; ?>
+                                                        <?php else: ?>
+                                                            <div class="d-flex flex-column justify-content-center align-items-center w-100 h-100">
+                                                                <i class="fas fa-image" style="color:#ccc;font-size:80px;"></i>
+                                                                <p class="text-muted mb-0">No image</p>
                                                             </div>
-                                                        <?php endforeach; ?>
-                                                    <?php else: ?>
-                                                        <div class="d-flex flex-column justify-content-center align-items-center w-100 h-100">
-                                                            <i class="fas fa-image" style="color:#ccc; font-size:80px;"></i>
-                                                            <p class="text-muted mb-0" style="font-size:0.9rem;">
-                                                                No image
-                                                            </p>
-                                                        </div>
-                                                    <?php endif; ?>
+                                                        <?php endif; ?>
+
+                                                    </div>
+
                                                 </div>
-                                            </div>
-                                            <div style="display: flex;">
-                                                <!-- <input type="hidden" name="post_id" value="<?= $post['id'] ?>">
-                                                <button 
-                                                    type="submit" 
-                                                    name="delete_post"
-                                                    class="btn btn-danger w-100"
-                                                    onclick="return confirm('Delete this post permanently?')"
-                                                >
-                                                Delete Post
-                                                </button> -->
-                                                <?php if (!empty($post['permalink'])): ?>
-                                                <a href="<?= htmlspecialchars($post['permalink']) ?>" 
-                                                target="_blank" 
-                                                class="btn btn-outline-secondary w-100" style="margin-left: 0px; font-size: 20px; padding: 9px; border: 2px solid;">
-                                                Go to Post
-                                                </a>
+
+                                                <!-- ACTIONS (OUTSIDE CARD) -->
+                                                <div style="display:flex; margin-top:10px;">
+
+                                                    <input type="hidden" name="post_id" value="<?= $post['id'] ?>">
+
+                                                    <button type="submit"
+                                                            name="delete_post"
+                                                            class="btn btn-danger w-100"
+                                                            onclick="return confirm('Delete this post permanently?')">
+                                                        Delete Post
+                                                    </button>
+
+                                                    <?php if (!empty($post['permalink'])): ?>
+                                                        <a href="<?= htmlspecialchars($post['permalink']) ?>"
+                                                        target="_blank"
+                                                        class="btn btn-outline-secondary w-100"
+                                                        style="margin-left:10px;">
+                                                            Go to Post
+                                                        </a>
+                                                    <?php endif; ?>
+
+                                                </div>
+
+                                            <!-- ========================= -->
+                                            <!-- 🌐 PUBLISHED -->
+                                            <!-- ========================= -->
+                                            <?php elseif ($status === 'published' && !empty($url)): ?>
+
+                                                <?php
+                                                $embedHtml = "";
+
+                                                if ($isMastodon) {
+                                                    preg_match('/https?:\/\/([^\/]+)/', $url, $m);
+                                                    $domain = $m[1] ?? null;
+
+                                                    if ($domain) {
+                                                        $api = "https://{$domain}/api/oembed?url=" . urlencode($url);
+                                                        $json = quickFetch($api);
+                                                        $embedHtml = $json['html'] ?? "";
+                                                    }
+
+                                                } else {
+                                                    $api = "https://publish.twitter.com/oembed?url=" . urlencode($url);
+                                                    $json = quickFetch($api);
+                                                    $embedHtml = $json['html'] ?? "";
+                                                }
+                                                ?>
+
+                                                <?php if (!empty($embedHtml)): ?>
+                                                    <div style="width:100%;">
+                                                        <?= $embedHtml ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <a href="<?= htmlspecialchars($url) ?>" target="_blank">
+                                                        View Post
+                                                    </a>
                                                 <?php endif; ?>
-                                            </div>
+
+                                            <!-- ========================= -->
+                                            <!-- ❌ FALLBACK -->
+                                            <!-- ========================= -->
+                                            <?php else: ?>
+
+                                                <p style="color:#999;">Post status not recognized: <?= htmlspecialchars($status) ?></p>
+
+                                            <?php endif; ?>
+
+                                        <?php endif; ?>
+
                                         </div>
                                     </div>
                                     <div class="ui-container second" style="width: 35% !important;">
@@ -1090,6 +1176,81 @@ a.btn-outline-secondary:hover{
 
                                         <?php endif; ?>
 
+                                    </div>
+                                </div>
+                                <div style="display: flex; justify-content: center;">
+                                    <div class="ui-container second" style="width: 87%;">
+                                        <h2 style="color: #312b2f; font-size: 24px;">
+                                            Replies
+                                            <i class="fas fa-comments" style="padding-left: 5px;"></i>
+                                        </h2>
+                                        <hr style="margin: 10px 0px 16px 0px;">
+
+                                        <?php
+                                        if (!empty($post['permalink'])) {
+
+                                            $url = $post['permalink'];
+
+                                            // Detect Mastodon
+                                            $isMastodon = preg_match('/https?:\/\/([^\/]+)\/@[^\/]+\/(\d+)/', $url, $matches);
+
+                                            if ($isMastodon) {
+
+                                                $domain = $matches[1];
+                                                $statusId = $matches[2];
+
+                                                // Fetch full thread context (replies included)
+                                                $contextUrl = "https://{$domain}/api/v1/statuses/{$statusId}/context";
+
+                                                function fetchJSON($url) {
+                                                    $ch = curl_init($url);
+                                                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                                                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                                                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                                                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                                                        "User-Agent: Mozilla/5.0"
+                                                    ]);
+                                                    $res = curl_exec($ch);
+                                                    curl_close($ch);
+                                                    return json_decode($res, true);
+                                                }
+
+                                                $context = fetchJSON($contextUrl);
+
+                                                if (!empty($context['descendants'])) {
+
+                                                    echo "<div style='display:flex; flex-direction:column; gap:10px;'>";
+
+                                                    foreach ($context['descendants'] as $reply) {
+
+                                                        $content = $reply['content'] ?? '';
+                                                        $author = $reply['account']['display_name'] ?? 'Unknown';
+                                                        $handle = $reply['account']['acct'] ?? '';
+                                                        $avatar = $reply['account']['avatar'] ?? '';
+
+                                                        echo "
+                                                        <div style='border:1px solid #ddd; border-radius:8px; padding:10px; display:flex; gap:10px;'>
+                                                            <img src='{$avatar}' style='width:40px; height:40px; border-radius:50%;'>
+                                                            
+                                                            <div>
+                                                                <strong>{$author}</strong> @{$handle}
+                                                                <div style='margin-top:5px;'>{$content}</div>
+                                                            </div>
+                                                        </div>
+                                                        ";
+                                                    }
+
+                                                    echo "</div>";
+
+                                                } else {
+                                                    echo "<p>No replies found.</p>";
+                                                }
+
+                                            } else {
+                                                echo "<p style='color:#999;'>Replies unavailable for Twitter/X without API or scraping backend.</p>";
+                                            }
+                                        }
+                                        ?>
                                     </div>
                                 </div>
                             </div>

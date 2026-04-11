@@ -480,6 +480,22 @@ thead[role="presentation"]{
     background-color: rgb(0 147 200 / 35%);
     color: white;
 }
+.fc-daygrid-event-dot{
+    display:none;
+}
+.fc-daygrid-dot-event i{
+    color: white !important;
+    font-weight: 100 !important;
+    pointer-events: none;
+    margin-left: 17px;
+    margin-right: 0px !important;
+}
+.fc-event-time {
+    margin-right: 6px !important;
+}
+.fc-event-time i{
+    padding-right: 4px;
+}
 </style>
 </head>
 <body>
@@ -507,11 +523,11 @@ thead[role="presentation"]{
             <div class="d-flex">
                 <div class="dashboard container container-fluid" id="dashboard">
                     <div style="width: 53%; margin: 0px 20px 15px 10px; color: #44424d;">
-                                <a href="dashboard.php">Posts</a> > <a style="color: #04a3ce !important; font-weight: bold;">Post List</a>
+                                <a href="dashboard.php">Content Calendar</a> > <a style="color: #04a3ce !important; font-weight: bold;">Scheduled Posts</a>
                             </div>
                     
                     <div class="ui-container">
-                        <h2 style="color: #312b2f !important;">Your Posts</h2>
+                        <h2 style="color: #312b2f !important; padding-left: 20px; margin: 0px 0px -5px 0px;">Scheduled Posts</h2>
                         <div id="calendar"></div>
                         
                     </div>
@@ -601,27 +617,35 @@ document.addEventListener('DOMContentLoaded', function () {
     const events = [
     <?php foreach ($posts as $post):
 
-        // Skip drafts
-        if (!empty($post['draft'])) {
-            continue;
-        }
+    if (!empty($post['draft'])) continue;
 
-        $postId = $post['id'] ?? '';
-        $content = addslashes(substr($post['content'] ?? 'No content',0,50));
-        $publish = $post['publish_at'] ?? '';
-        $status = !empty($post['published']) ? 'published' : 'scheduled';
+    $postId = $post['id'] ?? '';
+    $content = addslashes(substr($post['content'] ?? 'No content',0,50));
+    $publish = $post['publish_at'] ?? '';
 
-        $redirect = "post-view.php?id=$postId";
-    ?>
-    {
-        title: "<?= $content ?>",
-        start: "<?= $publish ?>",
-        url: "<?= $redirect ?>",
-        extendedProps: {
-            status: "<?= $status ?>"
-        }
-    },
-    <?php endforeach; ?>
+    $accountType = strtolower($post['account_type'] ?? '');
+
+    if (str_contains($accountType,'twitter')) $platformKey = 'twitter';
+    elseif (str_contains($accountType,'mastodon')) $platformKey = 'mastodon';
+    elseif (str_contains($accountType,'facebook')) $platformKey = 'facebook';
+    elseif (str_contains($accountType,'instagram')) $platformKey = 'instagram';
+    elseif (str_contains($accountType,'linkedin')) $platformKey = 'linkedin';
+    else $platformKey = 'unknown';
+
+    $status = !empty($post['published']) ? 'published' : 'scheduled';
+
+    $redirect = "post-view.php?id=$postId";
+?>
+{
+    title: "<?= $content ?>",
+    start: "<?= $publish ?>",
+    url: "<?= $redirect ?>",
+    extendedProps: {
+        status: "<?= $status ?>",
+        platform: "<?= $platformKey ?>"
+    }
+},
+<?php endforeach; ?>
     ];
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -646,7 +670,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         moreLinkContent: function(arg) {
-            return "More ++"; // 👈 custom text
+            return "+ More"; // 👈 custom text
         },
 
         eventClick: function(info) {
@@ -659,9 +683,7 @@ document.addEventListener('DOMContentLoaded', function () {
         eventDidMount: function(info) {
 
             const status = info.event.extendedProps.status;
-
-            if (status === "draft")
-                info.el.style.backgroundColor = "#bfbcca";
+            const platform = info.event.extendedProps.platform;
 
             if (status === "scheduled")
                 info.el.style.backgroundColor = "#d5a664";
@@ -669,6 +691,23 @@ document.addEventListener('DOMContentLoaded', function () {
             if (status === "published")
                 info.el.style.backgroundColor = "#59b062";
 
+            let icon = "fa-share";
+
+            if (platform === "facebook") icon = "fa-facebook";
+            if (platform === "twitter") icon = "fa-twitter";
+            if (platform === "instagram") icon = "fa-instagram";
+            if (platform === "linkedin") icon = "fa-linkedin";
+            if (platform === "mastodon") icon = "fa-mastodon";
+
+            const timeEl = info.el.querySelector('.fc-event-time');
+
+            if (timeEl) {
+                const iconEl = document.createElement("i");
+                iconEl.className = `fab ${icon}`;
+                iconEl.style.marginRight = "6px";
+
+                timeEl.prepend(iconEl); // 👈 places icon BEFORE the time
+            }
         }
 
     });
