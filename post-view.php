@@ -68,6 +68,54 @@ if (!$post || empty($post['id'])) {
 }
 
 
+$post = json_decode($response, true);
+
+if (!$post || empty($post['id'])) {
+    die("Post not found in response");
+}
+
+/* =====================================================
+   🔥 ADD REPLIES FETCHING HERE
+===================================================== */
+
+$repliesData = [];
+
+$url = $post['permalink'] ?? '';
+$isMastodon = preg_match('/https?:\/\/([^\/]+)\/@[^\/]+\/(\d+)/', $url, $matches);
+
+if ($isMastodon) {
+
+    $domain = $matches[1];
+    $statusId = $matches[2];
+
+    $contextUrl = "https://{$domain}/api/v1/statuses/{$statusId}/context";
+
+    function fetchJSON($url) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "User-Agent: Mozilla/5.0"
+        ]);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        return json_decode($res, true);
+    }
+
+    $context = fetchJSON($contextUrl);
+
+    if (!empty($context['descendants'])) {
+        foreach ($context['descendants'] as $reply) {
+            $repliesData[] = [
+                "author" => $reply['account']['display_name'] ?? 'Unknown',
+                "handle" => $reply['account']['acct'] ?? '',
+                "content" => strip_tags($reply['content'] ?? ''),
+                "avatar" => $reply['account']['avatar'] ?? ''
+            ];
+        }
+    }
+}
 /* =====================================================
    DETERMINE POST TYPE
 ===================================================== */
@@ -173,9 +221,6 @@ list($metricsCode, $metricsResponse) =
 
 $metricsData = json_decode($metricsResponse, true);
 
-echo "<pre>";
-echo htmlspecialchars($metricsResponse);
-echo "</pre>";
 /* =====================================================
    FETCH ACCOUNT INFO
 ===================================================== */
@@ -289,6 +334,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_post'])) {
         $responseMessage = "Failed to delete post.<br>
         Status: $statusCode
         <pre>$response</pre>";
+    }
+}
+
+$metricsTotals = [];
+
+if (!empty($metricsData['data'])) {
+    foreach ($metricsData['data'] as $metric => $entries) {
+
+        $total = 0;
+
+        foreach ($entries as $entry) {
+            $total += intval($entry['value']);
+        }
+
+        $metricsTotals[$metric] = $total;
     }
 }
 ?>
@@ -854,17 +914,74 @@ a.btn-outline-secondary:hover{
     transform: scale(1.02);
 }
 
+.chat-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f0f2f6;
+    height: 500px;
+}
+
+.msg-row {
+    display: flex;
+    width: 100%;
+}
+
+.msg {
+    max-width: 70%;
+    padding: 0px 14px;
+    border-radius: 12px;
+    white-space: pre-wrap;
+    font-size: 14px;
+}
+
+.msg.user {
+    margin-left: auto;
+    background: #04a3ce;
+    color: white;
+    border-bottom-right-radius: 4px;
+    padding: 10px 14px;
+}
+
+.msg.ai {
+    margin-right: auto;
+    background: white;
+    color: #111;
+    border-bottom-left-radius: 4px;
+}
+
+textarea:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: inherit !important;
+}
+
+.Options button{
+    background-color: transparent !important;
+    border: 2px #8e9093 solid !important;
+    color: #8e9093 !important;
+    transition: 0.25s;
+}
+
+.Options button:hover{
+    transform: scale(1.0) !important;
+    background-color: transparent !important;
+    color: #04a3ce !important;
+    border: 2px #04a3ce solid !important;
+}
 </style>
 </head>
-
-
-
-
 
 <body>
     <div class="wrapper">
         <div class="d-flex">
-            <?php include 'sidebar.php'; ?>
+            <?php
+                include 'sidebar.php';
+                $status = trim(strtolower($postStatus ?? 'unknown'));
+            ?>
             <div style="width:100%;">
                 <div class="py-3 px-3 d-flex justify-content-between align-items-center" style="background-color:white; margin-bottom:20px;">
                     <h1 class="mb-0">Post Overview</h1>
@@ -905,7 +1022,11 @@ a.btn-outline-secondary:hover{
                             </div>
                             <div style="display: flex; flex-direction: column;">
                                 <div style="display: flex; justify-content: center;">
-                                    <div class="ui-container">
+                                    <?php if ($status === 'scheduled'): ?>
+                                        <div class="ui-container" style="width: 50% !important;">
+                                    <?php else: ?>
+                                        <div class="ui-container" style="width: 40% !important;">
+                                    <?php endif; ?>
                                         <h2 style="color: #312b2f; font-size: 24px;">
                                             Post Details
                                             <i class="fas fa-info-circle" style="padding-left: 7px; font-size: 21px;"></i>
@@ -917,7 +1038,6 @@ a.btn-outline-secondary:hover{
 
                                             <?php
                                             $url = $post['permalink'] ?? '';
-                                            $status = strtolower($postStatus ?? 'unknown');
 
                                             $isMastodon = preg_match('/https?:\/\/[^\/]+\/@[^\/]+\/\d+/', $url);
 
@@ -934,125 +1054,125 @@ a.btn-outline-secondary:hover{
                                                 return json_decode($res, true);
                                             }
                                             ?>
-<!-- 📝 SCHEDULED -->
-                                                <?php if ($status === 'scheduled'): ?>
+                                            <!-- 📝 SCHEDULED -->
+                                            <?php if ($status === 'scheduled'): ?>
 
-                                                <div class="post-card d-flex justify-content-between align-items-start" style="position: relative;">
+                                            <div class="post-card d-flex justify-content-between align-items-start" style="position: relative;">
 
-                                                    <?php
-                                                    $postContent = htmlspecialchars($post['content'] ?? '[No content]');
-                                                    $publishAt   = utcToMalaysia($post['publish_at'] ?? '');
-                                                    $createdAt   = utcToMalaysia($post['created_at'] ?? '');
-                                                    $accountId   = $post['account_id'] ?? '';
+                                                <?php
+                                                $postContent = htmlspecialchars($post['content'] ?? '[No content]');
+                                                $publishAt   = utcToMalaysia($post['publish_at'] ?? '');
+                                                $createdAt   = utcToMalaysia($post['created_at'] ?? '');
+                                                $accountId   = $post['account_id'] ?? '';
 
-                                                    $accountPfp  = $accountImage ?? 'assets/default-avatar.png';
-                                                    $accountName = $accountName ?? 'Unknown Account';
+                                                $accountPfp  = $accountImage ?? 'assets/default-avatar.png';
+                                                $accountName = $accountName ?? 'Unknown Account';
 
-                                                    $platformColors = [
-                                                        'twitter'   => '#42a1dd',
-                                                        'mastodon'  => '#6565c8',
-                                                        'facebook'  => '#5883bb',
-                                                        'instagram' => '#c75078',
-                                                        'linkedin'  => '#2789bd'
-                                                    ];
+                                                $platformColors = [
+                                                    'twitter'   => '#42a1dd',
+                                                    'mastodon'  => '#6565c8',
+                                                    'facebook'  => '#5883bb',
+                                                    'instagram' => '#c75078',
+                                                    'linkedin'  => '#2789bd'
+                                                ];
 
-                                                    $platformColor = $platformColors[$platform] ?? '#9a97a7';
-                                                    ?>
+                                                $platformColor = $platformColors[$platform] ?? '#9a97a7';
+                                                ?>
 
-                                                    <!-- LEFT -->
-                                                    <div class="post-info" style="flex:1; padding-right:15px;">
+                                                <!-- LEFT -->
+                                                <div class="post-info" style="flex:1; padding-right:15px;">
 
-                                                        <div class="d-flex align-items-center mb-2">
-                                                            <img src="<?= $accountPfp ?>"
-                                                                style="width:50px;height:50px;border-radius:50%;margin-right:10px;border:1px solid #ddd;">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <img src="<?= $accountPfp ?>"
+                                                            style="width:50px;height:50px;border-radius:50%;margin-right:10px;border:1px solid #ddd;">
 
-                                                            <div>
-                                                                <div style="font-weight:600;color:#312b2f;">
-                                                                    <?= htmlspecialchars($accountName) ?>
-                                                                </div>
+                                                        <div>
+                                                            <div style="font-weight:600;color:#312b2f;">
+                                                                <?= htmlspecialchars($accountName) ?>
+                                                            </div>
 
-                                                                <div class="d-flex gap-2">
-                                                                    <span style="background:#fff;color:<?= $platformColor ?>;
-                                                                                padding:2px 8px;border-radius:4px;border:2px solid <?= $platformColor ?>;">
-                                                                        <?= ucfirst($platform) ?>
-                                                                    </span>
+                                                            <div class="d-flex gap-2">
+                                                                <span style="background:#fff;color:<?= $platformColor ?>;
+                                                                            padding:2px 8px;border-radius:4px;border:2px solid <?= $platformColor ?>;">
+                                                                    <?= ucfirst($platform) ?>
+                                                                </span>
 
-                                                                    <span style="background:<?= $statusColor ?>;color:<?= $textColor ?>;
-                                                                                padding:2px 8px;border-radius:4px;border:2px solid <?= $statusColor ?>;">
-                                                                        <?= $statusLabel ?>
-                                                                    </span>
-                                                                </div>
+                                                                <span style="background:<?= $statusColor ?>;color:<?= $textColor ?>;
+                                                                            padding:2px 8px;border-radius:4px;border:2px solid <?= $statusColor ?>;">
+                                                                    <?= $statusLabel ?>
+                                                                </span>
                                                             </div>
                                                         </div>
-
-                                                        <strong style="display:block;margin-bottom:30px;">
-                                                            <?= nl2br($postContent) ?>
-                                                        </strong>
-
-                                                        <small style="position:absolute;bottom:15px;left:15px;">
-                                                            <i class="fas fa-clock"></i>
-                                                            <b><?= $publishAt ?></b>
-                                                        </small>
                                                     </div>
 
-                                                    <!-- RIGHT (IMAGES) -->
-                                                    <?php
-                                                    $validImages = [];
+                                                    <strong style="display:block;margin-bottom:30px;">
+                                                        <?= nl2br($postContent) ?>
+                                                    </strong>
 
-                                                    if (!empty($post['attachments'])) {
-                                                        foreach ($post['attachments'] as $att) {
-                                                            if (!empty($att['url'])) {
-                                                                $validImages[] = $att['url'];
-                                                            }
-                                                        }
-                                                    }
-
-                                                    $imageCount = count($validImages);
-
-                                                    $gridClass = $imageCount === 1 ? 'single' : ($imageCount > 1 ? 'multiple' : '');
-                                                    ?>
-
-                                                    <div class="post-images <?= $gridClass ?>">
-
-                                                        <?php if ($imageCount > 0): ?>
-                                                            <?php foreach ($validImages as $imgUrl): ?>
-                                                                <div>
-                                                                    <img src="<?= htmlspecialchars($imgUrl) ?>">
-                                                                </div>
-                                                            <?php endforeach; ?>
-                                                        <?php else: ?>
-                                                            <div class="d-flex flex-column justify-content-center align-items-center w-100 h-100">
-                                                                <i class="fas fa-image" style="color:#ccc;font-size:80px;"></i>
-                                                                <p class="text-muted mb-0">No image</p>
-                                                            </div>
-                                                        <?php endif; ?>
-
-                                                    </div>
-
+                                                    <small style="position:absolute;bottom:15px;left:15px;">
+                                                        <i class="fas fa-clock"></i>
+                                                        <b><?= $publishAt ?></b>
+                                                    </small>
                                                 </div>
 
-                                                <!-- ACTIONS (OUTSIDE CARD) -->
-                                                <div style="display:flex; margin-top:10px;">
+                                                <!-- RIGHT (IMAGES) -->
+                                                <?php
+                                                $validImages = [];
 
-                                                    <input type="hidden" name="post_id" value="<?= $post['id'] ?>">
+                                                if (!empty($post['attachments'])) {
+                                                    foreach ($post['attachments'] as $att) {
+                                                        if (!empty($att['url'])) {
+                                                            $validImages[] = $att['url'];
+                                                        }
+                                                    }
+                                                }
 
-                                                    <button type="submit"
-                                                            name="delete_post"
-                                                            class="btn btn-danger w-100"
-                                                            onclick="return confirm('Delete this post permanently?')">
-                                                        Delete Post
-                                                    </button>
+                                                $imageCount = count($validImages);
 
-                                                    <?php if (!empty($post['permalink'])): ?>
-                                                        <a href="<?= htmlspecialchars($post['permalink']) ?>"
-                                                        target="_blank"
-                                                        class="btn btn-outline-secondary w-100"
-                                                        style="margin-left:10px;">
-                                                            Go to Post
-                                                        </a>
+                                                $gridClass = $imageCount === 1 ? 'single' : ($imageCount > 1 ? 'multiple' : '');
+                                                ?>
+
+                                                <div class="post-images <?= $gridClass ?>">
+
+                                                    <?php if ($imageCount > 0): ?>
+                                                        <?php foreach ($validImages as $imgUrl): ?>
+                                                            <div>
+                                                                <img src="<?= htmlspecialchars($imgUrl) ?>">
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    <?php else: ?>
+                                                        <div class="d-flex flex-column justify-content-center align-items-center w-100 h-100">
+                                                            <i class="fas fa-image" style="color:#ccc;font-size:80px;"></i>
+                                                            <p class="text-muted mb-0">No image</p>
+                                                        </div>
                                                     <?php endif; ?>
 
                                                 </div>
+
+                                            </div>
+
+                                            <!-- ACTIONS (OUTSIDE CARD) -->
+                                            <div style="display:flex; margin-top:10px;">
+
+                                                <input type="hidden" name="post_id" value="<?= $post['id'] ?>">
+
+                                                <button type="submit"
+                                                        name="delete_post"
+                                                        class="btn btn-danger w-100"
+                                                        onclick="return confirm('Delete this post permanently?')">
+                                                    Delete Post
+                                                </button>
+
+                                                <?php if (!empty($post['permalink'])): ?>
+                                                    <a href="<?= htmlspecialchars($post['permalink']) ?>"
+                                                    target="_blank"
+                                                    class="btn btn-outline-secondary w-100"
+                                                    style="margin-left:10px;">
+                                                        Go to Post
+                                                    </a>
+                                                <?php endif; ?>
+
+                                            </div>
 
                                             <!-- ========================= -->
                                             <!-- 🌐 PUBLISHED -->
@@ -1095,6 +1215,7 @@ a.btn-outline-secondary:hover{
                                             <?php else: ?>
 
                                                 <p style="color:#999;">Post status not recognized: <?= htmlspecialchars($status) ?></p>
+                                                
 
                                             <?php endif; ?>
 
@@ -1102,14 +1223,18 @@ a.btn-outline-secondary:hover{
 
                                         </div>
                                     </div>
-                                    <div class="ui-container second" style="width: 35% !important;">
+                                    <?php if ($status === 'scheduled'): ?>
+                                        <div class="ui-container second" style="width: 35% !important;">
+                                    <?php else: ?>
+                                        <div class="ui-container second" style="width: 45% !important;">
+                                    <?php endif; ?>
                                         <h2 style="color: #312b2f; font-size: 24px;">
-                                            Post Insights
-                                            <i class="fas fa-share-square" style="padding-left: 5px;"></i>
+                                            Post Digest AI
+                                            <i class="fas fa-cog" style="padding-left: 5px;"></i>
                                         </h2>
                                         <hr style="margin: 10px 0px 16px 0px;">
                                         <div class="mb-3">
-                                            <label class="form-label">Engagement Metrics</label>
+                                            <!-- <label class="form-label">Engagement Metrics</label>
                                             <div class="input-group mb-2" style="flex-wrap: wrap; gap: 10px;">
                                                 <?php
                                                 if (!empty($metricsData['data'])) {
@@ -1128,6 +1253,33 @@ a.btn-outline-secondary:hover{
                                                     echo "<span>No engagement data available</span>";
                                                 }
                                                 ?>
+                                            </div> -->
+                                            <div style=" border: 1px solid #ddd; border-radius: 10px;">
+                                                <div id="chatBox" class="chat-box" style="border-top-left-radius: 10px; border-top-right-radius: 10px;"></div>
+                                                <div style="background-color: #f0f2f6; padding: 1px 0px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">
+                                                    <div style="display: flex; position: relative; background-color: #f0f2f6; margin: 5px;">
+                                                        <textarea id="postText" class="form-control" rows="5" placeholder="Paste post content here..." style="max-height: 85px; background-color: white !important; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px;"></textarea>
+                                                        <div style="margin-bottom:10px; position: absolute; top: 40px; left: 10px;" class="Options">
+                                                            <button type="button" class="btn btn-outline-primary analysis-btn" data-type="summary" style="font-size: 13px; background-color: transparent !important;">
+                                                                Short Summary
+                                                            </button>
+
+                                                            <?php if ($status !== 'scheduled' && $status === 'published' && !empty($url)): ?>
+                                                            <button type="button"
+                                                                    class="btn btn-outline-primary analysis-btn"
+                                                                    data-type="reception"
+                                                                    style="font-size: 13px;">
+                                                                Public Reception
+                                                            </button>
+                                                        <?php endif; ?>
+
+                                                            <button type="button" class="btn btn-outline-primary analysis-btn" data-type="sentiment" style="font-size: 13px;">
+                                                                Sentiment Breakdown
+                                                            </button>
+                                                        </div>
+                                                        <button type="button" onclick="getAISummary()" class="btn btn-primary AISummary" style="width: 95px;"><i class="fas fa-magic" style="font-size: 20px;"></i></button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1141,24 +1293,27 @@ a.btn-outline-secondary:hover{
                                         <hr style="margin: 10px 0px 16px 0px;">
 
                                         <?php
-                                        $totalEngagement = 0;
+                                            $hasData = false;
 
-                                        if (!empty($metricsData['data'])) {
-                                            foreach ($metricsData['data'] as $metric => $entries) {
-                                                foreach ($entries as $entry) {
-                                                    $totalEngagement += intval($entry['value']);
+                                            if (!empty($metricsData['data'])) {
+                                                foreach ($metricsData['data'] as $entries) {
+                                                    foreach ($entries as $entry) {
+                                                        if (intval($entry['value']) !== 0) {
+                                                            $hasData = true;
+                                                            break 2; // stop both loops early
+                                                        }
+                                                    }
                                                 }
                                             }
-                                        }
                                         ?>
 
-                                        <?php if ($totalEngagement > 0): ?>
+                                        <?php if ($hasData == true): ?>
 
                                             <div class="mb-3">
                                                 <div>
                                                     <label for="metricsRange" class="form-label">Select Range:</label>
                                                     <select id="metricsRange" class="form-select" style="width:200px; display:inline-block;">
-                                                        <option value="24h">First 24 Hours</option>
+                                                        <!-- <option value="24h">First 24 Hours</option> -->
                                                         <option value="week">First Week</option>
                                                         <option value="month">First Month</option>
                                                         <option value="all" selected>Overall</option>
@@ -1186,71 +1341,39 @@ a.btn-outline-secondary:hover{
                                         </h2>
                                         <hr style="margin: 10px 0px 16px 0px;">
 
-                                        <?php
-                                        if (!empty($post['permalink'])) {
+                                        <?php if (!empty($repliesData)): ?>
 
-                                            $url = $post['permalink'];
+                                            <div style="display:flex; flex-direction:column; gap:10px;">
 
-                                            // Detect Mastodon
-                                            $isMastodon = preg_match('/https?:\/\/([^\/]+)\/@[^\/]+\/(\d+)/', $url, $matches);
+                                                <?php foreach ($repliesData as $reply): ?>
 
-                                            if ($isMastodon) {
+                                                    <div style="border:1px solid #ddd; border-radius:8px; padding:10px; display:flex; gap:10px;">
+                                                        
+                                                        <img src="<?= htmlspecialchars($reply['avatar']) ?>"
+                                                            style="width:40px; height:40px; border-radius:50%;">
 
-                                                $domain = $matches[1];
-                                                $statusId = $matches[2];
+                                                        <div>
+                                                            <strong><?= htmlspecialchars($reply['author']) ?></strong>
+                                                            @<?= htmlspecialchars($reply['handle']) ?>
 
-                                                // Fetch full thread context (replies included)
-                                                $contextUrl = "https://{$domain}/api/v1/statuses/{$statusId}/context";
-
-                                                function fetchJSON($url) {
-                                                    $ch = curl_init($url);
-                                                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                                                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                                                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                                                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                                                        "User-Agent: Mozilla/5.0"
-                                                    ]);
-                                                    $res = curl_exec($ch);
-                                                    curl_close($ch);
-                                                    return json_decode($res, true);
-                                                }
-
-                                                $context = fetchJSON($contextUrl);
-
-                                                if (!empty($context['descendants'])) {
-
-                                                    echo "<div style='display:flex; flex-direction:column; gap:10px;'>";
-
-                                                    foreach ($context['descendants'] as $reply) {
-
-                                                        $content = $reply['content'] ?? '';
-                                                        $author = $reply['account']['display_name'] ?? 'Unknown';
-                                                        $handle = $reply['account']['acct'] ?? '';
-                                                        $avatar = $reply['account']['avatar'] ?? '';
-
-                                                        echo "
-                                                        <div style='border:1px solid #ddd; border-radius:8px; padding:10px; display:flex; gap:10px;'>
-                                                            <img src='{$avatar}' style='width:40px; height:40px; border-radius:50%;'>
-                                                            
-                                                            <div>
-                                                                <strong>{$author}</strong> @{$handle}
-                                                                <div style='margin-top:5px;'>{$content}</div>
+                                                            <div style="margin-top:5px;">
+                                                                <?= htmlspecialchars($reply['content']) ?>
                                                             </div>
                                                         </div>
-                                                        ";
-                                                    }
 
-                                                    echo "</div>";
+                                                    </div>
 
-                                                } else {
-                                                    echo "<p>No replies found.</p>";
-                                                }
+                                                <?php endforeach; ?>
 
-                                            } else {
-                                                echo "<p style='color:#999;'>Replies unavailable for Twitter/X without API or scraping backend.</p>";
-                                            }
-                                        }
-                                        ?>
+                                            </div>
+
+                                        <?php else: ?>
+
+                                            <p style="color:#999;">
+                                                No replies found or unavailable for this platform.
+                                            </p>
+
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -1263,19 +1386,27 @@ a.btn-outline-secondary:hover{
     <!-- <pre><?= htmlspecialchars($metricsResponse) ?></pre> -->
 </body>
 <script>
-    // Raw data from PHP
-    const rawReplies    = <?= json_encode($metricsData['data']['replies']) ?>;
-    const rawReblogs    = <?= json_encode($metricsData['data']['reblogs']) ?>;
-    const rawFavourites = <?= json_encode($metricsData['data']['favourites']) ?>;
+    const replies = <?= json_encode($repliesData ?? []) ?>;
+
+    // ✅ Get ALL metrics dynamically from PHP
+    const rawMetrics = <?= json_encode($metricsData['data'] ?? []) ?>;
 
     const ctx = document.getElementById('metricsChart');
     let metricsChart;
 
-    // Function to filter data by range
+    // 🎨 Auto colors (fallback palette)
+    const colors = [
+        '#007bff', '#28a745', '#ffc107', '#dc3545',
+        '#6f42c1', '#17a2b8', '#fd7e14', '#20c997'
+    ];
+
+    // Filter data by range
     function filterByRange(dataArray, range) {
         const now = new Date();
+
         return dataArray.filter(item => {
             const itemDate = new Date(item.date);
+
             switch (range) {
                 case '24h':
                     return now - itemDate <= 24 * 60 * 60 * 1000;
@@ -1283,14 +1414,13 @@ a.btn-outline-secondary:hover{
                     return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
                 case 'month':
                     return now - itemDate <= 30 * 24 * 60 * 60 * 1000;
-                case 'all':
                 default:
                     return true;
             }
         });
     }
 
-    // Convert date to "DD/MM" format
+    // Format date labels
     function formatDates(array) {
         return array.map(item => {
             const d = new Date(item.date);
@@ -1298,42 +1428,39 @@ a.btn-outline-secondary:hover{
         });
     }
 
-    // Update chart data
     function updateRange(range) {
-        const filteredReplies    = filterByRange(rawReplies, range);
-        const filteredReblogs    = filterByRange(rawReblogs, range);
-        const filteredFavourites = filterByRange(rawFavourites, range);
 
-        const labels = formatDates(filteredReplies);
-        const replies    = filteredReplies.map(item => item.value);
-        const reblogs    = filteredReblogs.map(item => item.value);
-        const favourites = filteredFavourites.map(item => item.value);
+        const metricKeys = Object.keys(rawMetrics);
+
+        if (metricKeys.length === 0) return;
+
+        let labels = [];
+        let datasets = [];
+
+        metricKeys.forEach((metric, index) => {
+
+            const filtered = filterByRange(rawMetrics[metric], range);
+
+            if (filtered.length === 0) return;
+
+            // Use first metric for labels
+            if (labels.length === 0) {
+                labels = formatDates(filtered);
+            }
+
+            datasets.push({
+                label: metric.charAt(0).toUpperCase() + metric.slice(1),
+                data: filtered.map(item => item.value),
+                borderColor: colors[index % colors.length],
+                backgroundColor: colors[index % colors.length] + '20',
+                tension: 0.3
+            });
+
+        });
 
         const chartData = {
             labels: labels,
-            datasets: [
-                {
-                    label: 'Replies',
-                    data: replies,
-                    borderColor: '#007bff',
-                    backgroundColor: 'rgba(0,123,255,0.1)',
-                    tension: 0.3
-                },
-                {
-                    label: 'Reblogs',
-                    data: reblogs,
-                    borderColor: '#28a745',
-                    backgroundColor: 'rgba(40,167,69,0.1)',
-                    tension: 0.3
-                },
-                {
-                    label: 'Favourites',
-                    data: favourites,
-                    borderColor: '#ffc107',
-                    backgroundColor: 'rgba(255,193,7,0.1)',
-                    tension: 0.3
-                }
-            ]
+            datasets: datasets
         };
 
         if (metricsChart) {
@@ -1345,9 +1472,20 @@ a.btn-outline-secondary:hover{
                 data: chartData,
                 options: {
                     responsive: true,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { position: 'top' } },
-                    scales: { y: { beginAtZero: true } }
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
                 }
             });
         }
@@ -1358,7 +1496,276 @@ a.btn-outline-secondary:hover{
         updateRange(e.target.value);
     });
 
-    // Initial chart load
+    // Initial load
     updateRange('all');
+</script>
+<script>
+document.querySelectorAll(".analysis-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const type = btn.dataset.type;
+
+        // auto-fill prompt based on button type
+        let prompt = "";
+
+        switch (type) {
+            case "summary":
+                prompt = "Give a short summary of this post";
+                break;
+
+            case "reception":
+                prompt = "Analyze the public reception of this post";
+                break;
+
+            case "sentiment":
+                prompt = "Break down the sentiment of this post";
+                break;
+
+            default:
+                prompt = "";
+        }
+
+        // put into textarea
+        document.getElementById("postText").value = prompt;
+
+        // immediately send
+        getAISummary();
+    });
+});
+</script>
+<script>
+document.getElementById("postText").addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && e.ctrlKey) {
+        getAISummary();
+    }
+});
+</script>
+<!-- <script>
+async function getAISummary() {
+
+    const postText = document.getElementById("postText").value.trim();
+
+    const metrics = <?= json_encode($metricsTotals ?? []) ?>;
+    const embed = <?= json_encode($post['content'] ?? '') ?>;
+
+    const finalPrompt = postText || "Analyze this post:";
+
+    const chatBox = document.getElementById("chatBox");
+
+    // =========================
+    // 1. USER MESSAGE
+    // =========================
+    const userMsg = document.createElement("div");
+    userMsg.className = "msg-row";
+    userMsg.innerHTML = `
+        <div class="msg user">${escapeHtml(postText)}</div>
+    `;
+    chatBox.appendChild(userMsg);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    try {
+        const res = await fetch("ai_chat.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                text: finalPrompt,
+                embed: embed,
+                replies: replies,
+                metrics: metrics
+            })
+        });
+
+        // 🔥 IMPORTANT: read as TEXT first (NOT JSON)
+        const raw = await res.text();
+        console.log("RAW RESPONSE:", raw);
+
+        let data = {};
+        try {
+            data = JSON.parse(raw);
+        } catch (e) {
+            throw new Error("Invalid JSON from server:\n" + raw);
+        }
+
+        // =========================
+        // 2. EXTRACT OUTPUT SAFELY
+        // =========================
+        let output = "";
+
+        if (data?.debug?.raw_gemini_response) {
+            output = data.debug.raw_gemini_response;
+        } else if (data?.summary) {
+            output = data.summary;
+        } else if (data?.debug?.gemini_error) {
+            output = "Gemini Error:\n" + JSON.stringify(data.debug.gemini_error, null, 2);
+        } else {
+            output = "No response returned.";
+        }
+
+        // =========================
+        // 3. AI MESSAGE
+        // =========================
+        const aiMsg = document.createElement("div");
+        aiMsg.className = "msg-row";
+        aiMsg.innerHTML = `
+            <div class="msg ai" style="white-space: pre-wrap; font-family: monospace;">
+                ${escapeHtml(output)}
+            </div>
+        `;
+
+        chatBox.appendChild(aiMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+    } catch (err) {
+        console.error("FETCH ERROR:", err);
+
+        const errorMsg = document.createElement("div");
+        errorMsg.className = "msg-row";
+        errorMsg.innerHTML = `
+            <div class="msg ai" style="white-space: pre-wrap; color: red;">
+                ${escapeHtml(err.message)}
+            </div>
+        `;
+
+        chatBox.appendChild(errorMsg);
+    }
+}
+
+// prevent HTML injection
+function escapeHtml(text) {
+    return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
+</script> -->
+<script>
+async function getAISummary() {
+
+    const postText = document.getElementById("postText").value.trim();
+    const metrics = <?= json_encode($metricsTotals ?? []) ?>;
+    const embed = <?= json_encode($post['content'] ?? '') ?>;
+
+    const finalPrompt = postText || "Analyze this post:";
+    const chatBox = document.getElementById("chatBox");
+
+    // =========================
+    // USER MESSAGE
+    // =========================
+    const userMsg = document.createElement("div");
+    userMsg.className = "msg-row";
+    userMsg.innerHTML = `<div class="msg user">${escapeHtml(postText)}</div>`;
+    chatBox.appendChild(userMsg);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    // =========================
+    // LOADING INDICATOR
+    // =========================
+    const loadingEl = showLoading(chatBox);
+
+    try {
+        const res = await fetch("ai_chat.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                text: finalPrompt,
+                embed: embed,
+                replies: replies ?? [],
+                metrics: metrics
+            })
+        });
+
+        const data = await res.json();
+
+        // remove loading bubble
+        loadingEl.remove();
+
+        let output = "";
+
+        if (data?.summary) {
+            output = data.summary;
+        } else {
+            output = "No response returned.";
+        }
+
+        const aiMsg = document.createElement("div");
+        aiMsg.className = "msg-row";
+        aiMsg.innerHTML = `
+            <div class="msg ai">
+                ${formatAIText(output)}
+            </div>
+        `;
+
+        chatBox.appendChild(aiMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+    } catch (err) {
+
+        loadingEl.remove();
+
+        const errorMsg = document.createElement("div");
+        errorMsg.className = "msg-row";
+        errorMsg.innerHTML = `
+            <div class="msg ai" style="color:red;">
+                Error generating response.
+            </div>
+        `;
+
+        chatBox.appendChild(errorMsg);
+    }
+}
+
+function formatAIText(text) {
+    if (!text) return "";
+
+    let html = String(text);
+
+    // 1. Escape HTML first (security)
+    html = html
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+
+    // 2. Bold **text**
+    html = html.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+
+    return html;
+}
+
+// fallback if you still use escapeHtml elsewhere
+function escapeHtml(text) {
+    return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const chatBox = document.getElementById("chatBox");
+
+    const intro = document.createElement("div");
+    intro.className = "msg-row";
+    intro.innerHTML = `<div class="msg ai" style="padding: 10px 14px;">I'm your <b>Post Digest AI Assistant</b>! What would you like help with today?</div>`;
+
+    chatBox.appendChild(intro);
+});
+
+function showLoading(chatBox) {
+    const loadingRow = document.createElement("div");
+    loadingRow.className = "msg-row";
+    loadingRow.id = "ai-loading";
+
+    loadingRow.innerHTML = `
+        <div class="msg ai" style="display:flex; align-items:center; gap:10px;">
+            <i class="fas fa-spinner fa-spin"></i>
+            Analyzing...
+        </div>
+    `;
+
+    chatBox.appendChild(loadingRow);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    return loadingRow;
+}
 </script>
 </html>
