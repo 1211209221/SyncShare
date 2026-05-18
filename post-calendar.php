@@ -496,6 +496,16 @@ thead[role="presentation"]{
 .fc-event-time i{
     padding-right: 4px;
 }
+
+#postPreviewTooltip {
+    transition: opacity 0.15s ease;
+}
+.mastodon-embed {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+}
+
 </style>
 </head>
 <body>
@@ -536,116 +546,64 @@ thead[role="presentation"]{
         </div>
     </div>
 </div>
+<div id="postPreviewTooltip" style="
+    position: absolute;
+    display: none;
+    z-index: 9999;
+    width: 350px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    padding: 10px;
+"></div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('accountSearch');
-    const filterSelect = document.getElementById('accountFilter');
-    const statusFilter = document.getElementById('statusFilter');
-    const postCards = document.querySelectorAll('.accounts-grid .post-card');
+<!-- Twitter embed script (REQUIRED) -->
+<script async src="https://platform.twitter.com/widgets.js"></script>
 
-    function getPlatformIcon(platform) {
-        switch (platform) {
-            case 'twitter':
-                return '<i class="fab fa-twitter"></i>';
-            case 'facebook':
-                return '<i class="fab fa-facebook"></i>';
-            case 'instagram':
-                return '<i class="fab fa-instagram"></i>';
-            case 'linkedin':
-                return '<i class="fab fa-linkedin"></i>';
-            case 'mastodon':
-                return '<i class="fab fa-mastodon"></i>';
-            default:
-                return '<i class="fas fa-share"></i>';
-        }
-    }
-
-    function filterPosts() {
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        const selectedPlatform = filterSelect.value.toLowerCase();
-        let anyVisible = false;
-
-        postCards.forEach(card => {
-            const content = card.querySelector('strong')?.textContent.toLowerCase() || '';
-            const platformElement = card.querySelector('.platform-tag');
-            let platformTag = platformElement?.textContent.toLowerCase().trim() || '';
-
-            // Normalize platform
-            if (platformTag.includes('twitter')) platformTag = 'twitter';
-            else if (platformTag.includes('mastodon')) platformTag = 'mastodon';
-            else if (platformTag.includes('facebook')) platformTag = 'facebook';
-            else if (platformTag.includes('instagram')) platformTag = 'instagram';
-            else if (platformTag.includes('linkedin')) platformTag = 'linkedin';
-
-            // Inject icon (only once)
-            if (platformElement && !platformElement.dataset.iconInjected) {
-                platformElement.innerHTML = getPlatformIcon(platformTag) + platformElement.textContent;
-                platformElement.dataset.iconInjected = "true";
-            }
-
-            const matchesSearch = content.includes(searchTerm);
-            const status = card.dataset.status || '';
-            const selectedStatus = statusFilter.value.toLowerCase();
-
-            const matchesPlatform = selectedPlatform === '' || platformTag === selectedPlatform;
-            const matchesStatus = selectedStatus === '' || status === selectedStatus;
-
-            if (matchesSearch && matchesPlatform && matchesStatus){
-                card.classList.remove('hidden');
-                anyVisible = true;
-            } else {
-                card.classList.add('hidden');
-            }
-        });
-
-        document.getElementById('noResultsMessage').style.display = anyVisible ? 'none' : 'block';
-    }
-
-    searchInput.addEventListener('input', filterPosts);
-    filterSelect.addEventListener('change', filterPosts);
-    statusFilter.addEventListener('change', filterPosts);
-
-    filterPosts(); // run once on load
-});
-</script>
 <script>
+const embedCache = {};
+let hoverTimeout = null;
+
 document.addEventListener('DOMContentLoaded', function () {
 
     const calendarEl = document.getElementById('calendar');
+    const tooltip = document.getElementById("postPreviewTooltip");
 
     const events = [
     <?php foreach ($posts as $post):
 
-    if (!empty($post['draft'])) continue;
+        if (!empty($post['draft'])) continue;
 
-    $postId = $post['id'] ?? '';
-    $content = addslashes(substr($post['content'] ?? 'No content',0,50));
-    $publish = $post['publish_at'] ?? '';
+        $postId = $post['id'] ?? '';
+        $content = addslashes(substr($post['content'] ?? 'No content',0,50));
+        $publish = $post['publish_at'] ?? '';
+        $url = $post['permalink'] ?? '';
 
-    $accountType = strtolower($post['account_type'] ?? '');
+        $accountType = strtolower($post['account_type'] ?? '');
 
-    if (str_contains($accountType,'twitter')) $platformKey = 'twitter';
-    elseif (str_contains($accountType,'mastodon')) $platformKey = 'mastodon';
-    elseif (str_contains($accountType,'facebook')) $platformKey = 'facebook';
-    elseif (str_contains($accountType,'instagram')) $platformKey = 'instagram';
-    elseif (str_contains($accountType,'linkedin')) $platformKey = 'linkedin';
-    else $platformKey = 'unknown';
+        if (str_contains($accountType,'twitter')) $platformKey = 'twitter';
+        elseif (str_contains($accountType,'mastodon')) $platformKey = 'mastodon';
+        elseif (str_contains($accountType,'facebook')) $platformKey = 'facebook';
+        elseif (str_contains($accountType,'instagram')) $platformKey = 'instagram';
+        elseif (str_contains($accountType,'linkedin')) $platformKey = 'linkedin';
+        else $platformKey = 'unknown';
 
-    $status = !empty($post['published']) ? 'published' : 'scheduled';
-
-    $redirect = "post-view.php?id=$postId";
-?>
-{
-    title: "<?= $content ?>",
-    start: "<?= $publish ?>",
-    url: "<?= $redirect ?>",
-    extendedProps: {
-        status: "<?= $status ?>",
-        platform: "<?= $platformKey ?>"
-    }
-},
-<?php endforeach; ?>
+        $status = !empty($post['published']) ? 'published' : 'scheduled';
+        $redirect = "post-view.php?id=$postId";
+    ?>
+    {
+        title: "<?= $content ?>",
+        start: "<?= $publish ?>",
+        url: "<?= $redirect ?>",
+        extendedProps: {
+            status: "<?= $status ?>",
+            platform: "<?= $platformKey ?>",
+            permalink: "<?= addslashes($url) ?>"
+        }
+    },
+    <?php endforeach; ?>
     ];
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -660,18 +618,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         events: events,
-
-        dayMaxEvents: 2, // 👈 max posts shown per day
-
-        eventTimeFormat: {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        },
-
-        moreLinkContent: function(arg) {
-            return "+ More"; // 👈 custom text
-        },
+        dayMaxEvents: 2,
 
         eventClick: function(info) {
             info.jsEvent.preventDefault();
@@ -684,15 +631,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const status = info.event.extendedProps.status;
             const platform = info.event.extendedProps.platform;
+            const permalink = info.event.extendedProps.permalink;
 
-            if (status === "scheduled")
-                info.el.style.backgroundColor = "#d5a664";
+            // 🎨 Color
+            if (status === "scheduled") info.el.style.backgroundColor = "#d5a664";
+            if (status === "published") info.el.style.backgroundColor = "#59b062";
 
-            if (status === "published")
-                info.el.style.backgroundColor = "#59b062";
-
+            // 📱 Platform icon
             let icon = "fa-share";
-
             if (platform === "facebook") icon = "fa-facebook";
             if (platform === "twitter") icon = "fa-twitter";
             if (platform === "instagram") icon = "fa-instagram";
@@ -700,16 +646,100 @@ document.addEventListener('DOMContentLoaded', function () {
             if (platform === "mastodon") icon = "fa-mastodon";
 
             const timeEl = info.el.querySelector('.fc-event-time');
-
             if (timeEl) {
                 const iconEl = document.createElement("i");
                 iconEl.className = `fab ${icon}`;
                 iconEl.style.marginRight = "6px";
-
-                timeEl.prepend(iconEl); // 👈 places icon BEFORE the time
+                timeEl.prepend(iconEl);
             }
-        }
 
+            // =========================
+            // 🧠 HOVER PREVIEW LOGIC
+            // =========================
+            info.el.addEventListener("mouseenter", () => {
+
+                if (!permalink) return;
+
+                hoverTimeout = setTimeout(async () => {
+
+                    tooltip.style.display = "block";
+                    tooltip.innerHTML = "Loading...";
+
+                    let embedHtml = "";
+
+                    try {
+                        // ======================
+                        // MASTODON
+                        // ======================
+                        if (platform === "mastodon") {
+
+                            if (embedCache[permalink]) {
+                                embedHtml = embedCache[permalink];
+                            } else {
+
+                                embedHtml = `
+                                    <iframe
+                                        class="mastodon-embed"
+                                        src="${permalink}/embed"
+                                        scrolling="no"
+                                        allowfullscreen>
+                                    </iframe>
+                                `;
+
+                                embedCache[permalink] = embedHtml;
+                            }
+                        }
+                        // ======================
+                        // TWITTER / X
+                        // ======================
+                        else if (platform === "twitter") {
+
+                            if (embedCache[permalink]) {
+                                embedHtml = embedCache[permalink];
+                            } else {
+
+                                const res = await fetch(
+                                    `https://publish.twitter.com/oembed?url=${encodeURIComponent(permalink)}`
+                                );
+
+                                const data = await res.json();
+                                embedHtml = data.html || "";
+
+                                embedCache[permalink] = embedHtml;
+                            }
+                        }
+                        // ======================
+                        // FALLBACK
+                        // ======================
+                        else {
+                            embedHtml = `<a href="${permalink}" target="_blank">View Post</a>`;
+                        }
+
+                    } catch (err) {
+                        embedHtml = `<a href="${permalink}" target="_blank">View Post</a>`;
+                    }
+
+                    tooltip.innerHTML = embedHtml;
+
+                    // 🔥 REQUIRED for Twitter embeds
+                    if (window.twttr && window.twttr.widgets) {
+                        window.twttr.widgets.load(tooltip);
+                    }
+
+                    // 📍 Position (stable)
+                    const rect = info.el.getBoundingClientRect();
+                    tooltip.style.left = rect.right + 10 + "px";
+                    tooltip.style.top  = rect.top + window.scrollY + "px";
+
+                }, 200); // ⏱ delay prevents flicker
+            });
+
+            info.el.addEventListener("mouseleave", () => {
+                clearTimeout(hoverTimeout);
+                tooltip.style.display = "none";
+                tooltip.innerHTML = "";
+            });
+        }
     });
 
     calendar.render();

@@ -211,7 +211,6 @@ $query = http_build_query([
 
 $metricsUrl = "https://socialbu.com/api/v1/insights/posts/metrics?$query";
 
-
 /* =====================================================
    FETCH METRICS
 ===================================================== */
@@ -811,6 +810,9 @@ textarea, input{
     background: #f3f4f6 !important;
 }
 textarea{
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
     resize: none;
 }
 .form-label{
@@ -1273,8 +1275,8 @@ textarea:focus {
                                                             </button>
                                                         <?php endif; ?>
 
-                                                            <button type="button" class="btn btn-outline-primary analysis-btn" data-type="sentiment" style="font-size: 13px;">
-                                                                Sentiment Breakdown
+                                                            <button type="button" class="btn btn-outline-primary analysis-btn" data-type="performance" style="font-size: 13px;">
+                                                                Performance Tips
                                                             </button>
                                                         </div>
                                                         <button type="button" onclick="getAISummary()" class="btn btn-primary AISummary" style="width: 95px;"><i class="fas fa-magic" style="font-size: 20px;"></i></button>
@@ -1516,8 +1518,8 @@ document.querySelectorAll(".analysis-btn").forEach(btn => {
                 prompt = "Analyze the public reception of this post";
                 break;
 
-            case "sentiment":
-                prompt = "Break down the sentiment of this post";
+            case "performance":
+                prompt = "Suggest tips to boost engagement and audience response";
                 break;
 
             default:

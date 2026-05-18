@@ -323,8 +323,8 @@ button.add-account:hover {
   gap: 15px;
 }
 .post-images {
-    width: 210px;
-    height: 210px;
+    width: 170px;
+    height: 170px;
     display: grid;
     gap: 6px;
     overflow: hidden;
@@ -514,7 +514,7 @@ button.add-account:hover {
                                             <?= $content ?>
                                         </strong>
                                         <div>
-                                            <small class="small-muted">
+                                            <small class="small-muted" style="margin-bottom: 10px;">
                                                 <i class="fas fa-clock" style="padding-right: 6px;"></i> <b><?= $publishAt ?></b>
                                             </small>
                                             <!-- <small class="small-muted">
