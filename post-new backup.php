@@ -227,30 +227,7 @@ if ($httpcode !== 200) {
 // ===========================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"])) {
     $accounts_selected = isset($_POST['accounts']) ? array_map('intval', $_POST['accounts']) : [];
-    $platform_content = json_decode(
-        $_POST['platform_content'] ?? '{}',
-        true
-    );
-
-    // echo "<pre style='background:#111;color:#0f0;padding:10px;border-radius:8px;'>";
-    // echo "DEBUG: platform_content\n\n";
-
-    // if (is_array($platform_content)) {
-    //     foreach ($platform_content as $key => $value) {
-    //         echo "TAB: " . htmlspecialchars($key) . "\n";
-    //         echo "CONTENT:\n" . htmlspecialchars($value) . "\n";
-    //         echo "--------------------------\n";
-    //     }
-    // } else {
-    //     echo "No platform content found or invalid JSON.";
-    // }
-
-    // echo "</pre>";
-
-    
-    $content = trim(
-        $platform_content['main'] ?? ''
-    );
+    $content = trim($_POST['content'] ?? '');
     $upload_tokens = [];
 
     // ===========================
@@ -315,199 +292,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
 
     // 🔹 3️⃣ Validate
     if (empty($accounts_selected)) {
-
-        $responseMessage .= "<div class='alert alert-warning'>
-            ⚠️ Please select at least one account.
-        </div>";
-
+        $responseMessage .= "<div class='alert alert-warning'>⚠️ Please select at least one account.</div>";
+    } elseif (empty($content)) {
+        $responseMessage .= "<div class='alert alert-warning'>⚠️ Post content cannot be empty.</div>";
     } else {
-
-        $hasContent = false;
-
-        $mainContent = trim(
-            $platform_content['main'] ?? ''
-        );
-
-        foreach ($accounts_selected as $accountId) {
-
-            $individualContent = trim(
-                $platform_content[$accountId] ?? ''
-            );
-
-            // same rule as posting
-            if (
-                $individualContent !== '' ||
-                $mainContent !== ''
-            ) {
-                $hasContent = true;
-                break;
+        // Convert Malaysia time to UTC
+        $publish_at_input = trim($_POST['publish_at'] ?? '');
+        if (!empty($publish_at_input)) {
+            try {
+                $local = new DateTime($publish_at_input, new DateTimeZone('Asia/Kuala_Lumpur'));
+                $local->setTimezone(new DateTimeZone('UTC'));
+                $publish_at = $local->format('Y-m-d H:i:s');
+            } catch (Exception $e) {
+                $publish_at = gmdate("Y-m-d H:i:s");
             }
+        } else {
+            $publish_at = gmdate("Y-m-d H:i:s");
         }
 
-        if (!$hasContent) {
+        // 🔹 4️⃣ Create Post
+        $attachments = array_map(fn($t) => ["upload_token" => $t], $upload_tokens);
+        $payload = [
+            "accounts" => $accounts_selected,
+            "publish_at" => $publish_at,
+            "content" => $content,
+            "draft" => isset($_POST['draft']),
+            "existing_attachments" => $attachments,
+            "options" => new stdClass(),
+            "postback_url" => "",
+            "queue_ids" => [],
+            "team_id" => 0
+        ];
 
-            $responseMessage .= "<div class='alert alert-warning'>
-                ⚠️ Please enter content for at least one selected account.
-            </div>";
+        $json_payload = json_encode($payload, JSON_PRETTY_PRINT);
+        $ch = curl_init("https://socialbu.com/api/v1/posts");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $token,
+                'Accept: application/json',
+                'Content-Type: application/json'
+            ],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $json_payload
+        ]);
+        $response = curl_exec($ch);
+        $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+
+        if ($httpcode >= 200 && $httpcode < 300) {
+
+            $responseMessage .= '
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert" style="margin:0 !important;border:none !important;outline:none !important;color:#668f6c;">
+                <i class="fas fa-check-circle" style="margin-right:10px;"></i>
+                <b>Post created successfully!</b>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" style="background-color:transparent !important;"></button>
+            </div>';
 
         } else {
 
-            // ===========================
-            // Convert Malaysia time to UTC
-            // ===========================
-            $publish_at_input = trim($_POST['publish_at'] ?? '');
+            $responseMessage .= '
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert" style="margin:0 !important;border:none !important;outline:none !important;color:#683636;">
+                <i class="fas fa-times-circle" style="margin-right:10px;"></i>
+                <b>Failed to create post. Please try again.</b>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" style="background-color:transparent !important;"></button>
+            </div>';
 
-            if (!empty($publish_at_input)) {
-
-                try {
-
-                    $local = new DateTime(
-                        $publish_at_input,
-                        new DateTimeZone('Asia/Kuala_Lumpur')
-                    );
-
-                    $local->setTimezone(new DateTimeZone('UTC'));
-
-                    $publish_at = $local->format('Y-m-d H:i:s');
-
-                } catch (Exception $e) {
-
-                    $publish_at = gmdate("Y-m-d H:i:s");
-                }
-
-            } else {
-                $publish_at = gmdate("Y-m-d H:i:s");
-            }
-
-
-            // ===========================
-            // 🔹 4️⃣ Create Post
-            // ===========================
-
-            $attachments = array_map(
-                fn($t) => ["upload_token" => $t],
-                $upload_tokens
-            );
-
-            $success = true;
-
-
-            foreach ($accounts_selected as $accountId) {
-
-    $individualContent = trim(
-        $platform_content[$accountId] ?? ''
-    );
-
-    // Priority:
-    // 1. individual tab
-    // 2. main tab
-    // 3. skip
-    if ($individualContent !== '') {
-
-        $accountContent = $individualContent;
-
-    } elseif ($mainContent !== '') {
-
-        $accountContent = $mainContent;
-
-    } else {
-
-        continue;
-    }
-
-    // Debug
-    // echo "<pre>";
-    // echo "Account: {$accountId}\n";
-    // echo "Using: " .
-    //     ($individualContent !== ''
-    //         ? "INDIVIDUAL"
-    //         : "MAIN") . "\n";
-    // echo $accountContent . "\n";
-    // echo "</pre>";
-
-    $payload = [
-        "accounts" => [intval($accountId)],
-        "publish_at" => $publish_at,
-        "content" => $accountContent,
-        "draft" => isset($_POST['draft']),
-        "existing_attachments" => $attachments,
-        "options" => new stdClass(),
-        "postback_url" => "",
-        "queue_ids" => [],
-        "team_id" => 0
-    ];
-
-    $json_payload = json_encode(
-        $payload,
-        JSON_PRETTY_PRINT
-    );
-
-    $ch = curl_init(
-        "https://socialbu.com/api/v1/posts"
-    );
-
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $token,
-            'Accept: application/json',
-            'Content-Type: application/json'
-        ],
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $json_payload
-    ]);
-
-    $response = curl_exec($ch);
-    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_error = curl_error($ch);
-
-    curl_close($ch);
-
-    if ($httpcode < 200 || $httpcode >= 300) {
-        $success = false;
-    }
-}
-
-
-            // ===========================
-            // Final Result Message
-            // ===========================
-            if ($success) {
-
-                $responseMessage .= '
-                <div class="alert alert-success alert-dismissible fade show mt-3"
-                    role="alert"
-                    style="margin:0 !important;border:none !important;outline:none !important;color:#668f6c;">
-
-                    <i class="fas fa-check-circle" style="margin-right:10px;"></i>
-                    <b>Post created successfully!</b>
-
-                    <button type="button"
-                            class="btn-close"
-                            data-bs-dismiss="alert"
-                            style="background-color:transparent !important;">
-                    </button>
-
-                </div>';
-
-            } else {
-
-                $responseMessage .= '
-                <div class="alert alert-danger alert-dismissible fade show mt-3"
-                    role="alert"
-                    style="margin:0 !important;border:none !important;outline:none !important;color:#683636;">
-
-                    <i class="fas fa-times-circle" style="margin-right:10px;"></i>
-                    <b>Failed to create post. Please try again.</b>
-
-                    <button type="button"
-                            class="btn-close"
-                            data-bs-dismiss="alert"
-                            style="background-color:transparent !important;">
-                    </button>
-
-                </div>';
-            }
         }
     }
 }
@@ -824,62 +675,6 @@ label{
     transform: scale(1.03);
     filter: brightness(50%);
 }
-.platform-tab{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-
-    width:50px;
-    height:50px;
-
-    margin-right:10px;
-
-    border-radius:50%;
-    background:#f3f4f6;
-
-    cursor:pointer;
-    transition:0.2s;
-
-    padding:3px;
-}
-
-.platform-tab img{
-    width:100%;
-    height:100%;
-    border-radius:50%;
-    object-fit:cover;
-    filter:grayscale(100%);
-}
-
-.platform-tab.active img{
-    filter:grayscale(0%) !important;
-}
-.platform-tab.active{
-    background:#04a3ce;
-    transform:scale(1.08);
-}
-/* default main tab */
-.main-tab{
-
-    background:white !important;
-
-    border:3px solid #f3f4f6;
-
-    color:#f3f4f6;
-}
-
-
-/* when editing main content */
-.main-tab.active{
-
-    background:white !important;
-
-    border:3px solid #04a3ce;
-
-    color:#04a3ce;
-
-    transform:scale(1.08);
-}
 
 </style>
 </head>
@@ -952,32 +747,11 @@ label{
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                         
-<div class="mb-3">
 
-    <label class="form-label">Post Content</label>
-
-    <!-- tabs -->
-    <div id="platformTabs" class="mb-2"></div>
-
-    <!-- one textarea only -->
-    <textarea
-        style="height:160px;"
-        class="form-control"
-        id="postContent"
-        rows="4"
-        placeholder="Write your post here..."
-        required
-    ></textarea>
-
-    <!-- hidden JSON -->
-    <input
-        type="hidden"
-        id="platform_content"
-        name="platform_content"
-    >
-
-</div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Post Content</label>
+                                            <textarea style="height: 160px;" class="form-control" id="postContent" name="content" rows="4" placeholder="Write your post here..." required></textarea>
+                                        </div>
                                         
                                         <input type="hidden" id="library_images" name="library_images">
 
@@ -1076,252 +850,6 @@ label{
     </div>
 </div>
 </body>
-<script>
-    const accountCheckboxes =
-    document.querySelectorAll('.account-checkbox');
-
-const tabsContainer =
-    document.getElementById('platformTabs');
-
-const textarea =
-    document.getElementById('postContent');
-
-const hiddenInput =
-    document.getElementById('platform_content');
-
-let activeAccount = 'main';
-
-let platformContent = {
-    main: ''
-};
-
-accountCheckboxes.forEach(cb=>{
-
-    cb.addEventListener('change', function(){
-
-        const parent =
-            this.closest('.account-item');
-
-        parent.classList.toggle(
-            'active',
-            this.checked
-        );
-
-        updateTabs();
-    });
-
-});
-
-
-textarea.addEventListener('input', ()=>{
-
-    if(activeAccount !== null){
-
-        platformContent[activeAccount] =
-            textarea.value;
-
-        syncHiddenInput();
-    }
-});
-
-
-function updateTabs(){
-
-    const selected =
-        document.querySelectorAll(
-            '.account-checkbox:checked'
-        );
-
-
-    tabsContainer.innerHTML = '';
-
-
-    /* MAIN TAB ALWAYS EXISTS */
-    createMainTab();
-
-
-    /* if 0 or 1 account,
-       hide account tabs */
-    if(selected.length <= 1){
-
-        tabsContainer.style.display =
-            'none';
-
-        if(
-            activeAccount !== 'main' &&
-            !selectedNamed(activeAccount)
-        ){
-            activeAccount = 'main';
-        }
-
-        textarea.value =
-            platformContent[
-                activeAccount
-            ] || '';
-
-        syncHiddenInput();
-
-        return;
-    }
-
-
-    tabsContainer.style.display =
-        'flex';
-
-
-    selected.forEach(cb=>{
-
-        const accountId =
-            cb.value;
-
-        const accountCard =
-            cb.closest(
-                '.account-item'
-            );
-
-        const profileImage =
-            accountCard
-            .querySelector('img')
-            .src;
-
-
-        if(
-            platformContent[
-                accountId
-            ] === undefined
-        ){
-            platformContent[
-                accountId
-            ] = '';
-        }
-
-
-        const tab =
-            document.createElement(
-                'div'
-            );
-
-        tab.className =
-            'platform-tab';
-
-
-        if(
-            activeAccount ===
-            accountId
-        ){
-            tab.classList.add(
-                'active'
-            );
-        }
-
-
-        tab.innerHTML = `
-            <img
-                src="${profileImage}"
-            >
-        `;
-
-
-        tab.addEventListener(
-            'click',
-            ()=>switchTab(
-                accountId
-            )
-        );
-
-
-        tabsContainer.appendChild(
-            tab
-        );
-    });
-
-
-    textarea.value =
-        platformContent[
-            activeAccount
-        ] || '';
-
-
-    syncHiddenInput();
-}
-
-function createMainTab(){
-
-    const tab =
-        document.createElement(
-            'div'
-        );
-
-    tab.className =
-        'platform-tab main-tab';
-
-
-    if(
-        activeAccount ===
-        'main'
-    ){
-        tab.classList.add(
-            'active'
-        );
-    }
-
-
-    tab.innerHTML = `
-        <i
-            class="fas fa-pen"
-            style="
-                font-size:16px;
-                color:inherit;
-            "
-        ></i>
-    `;
-
-    tab.addEventListener(
-        'click',
-        ()=>switchTab(
-            'main'
-        )
-    );
-
-
-    tabsContainer.appendChild(
-        tab
-    );
-}
-
-function switchTab(accountId){
-
-    platformContent[
-        activeAccount
-    ] = textarea.value;
-
-
-    activeAccount =
-        accountId;
-
-
-    updateTabs();
-}
-
-
-function selectedNamed(accountId){
-
-    return document.querySelector(
-        `.account-checkbox[value="${accountId}"]:checked`
-    );
-}
-
-
-function syncHiddenInput(){
-
-    hiddenInput.value =
-        JSON.stringify(
-            platformContent
-        );
-}
-
-updateTabs();
-</script>
 <script>
 
 document.querySelectorAll('.account-checkbox').forEach(function(checkbox) {

@@ -341,6 +341,27 @@ function renderPostEmbed($url) {
     return "<a href='{$url}' target='_blank' style='word-break:break-all;'>{$url}</a>";
 }
 
+$topPostsClean = [];
+
+if (!empty($topPosts['data']['data'])) {
+
+    foreach ($topPosts['data']['data'] as $post) {
+        $url = $post['permalink'] ?? $post['url'] ?? '';
+        $content = trim($post['content'] ?? '');
+
+        if ($content === '') {
+            $content = '[No content available]';
+        }
+
+        $topPostsClean[] = [
+            'content' => $content,
+            'engagement' => $post['engagement'] ?? 0,
+            'url' => $url
+        ];
+    }
+}
+
+
 $aiPayload = [
     "summary" => [
         "posts_last_7_days" => $currentPosts,
@@ -366,13 +387,54 @@ $aiPayload = [
     "posts" => $postsCount['data']['data'] ?? [],
     "engagement_trend" => $engagementTrend['data']['data'] ?? [],
 
-    "top_posts" => array_map(function($post) {
-        return [
-            "url" => $post['permalink'] ?? $post['url'] ?? '',
-            "engagement" => $post['engagement'] ?? 0
-        ];
-    }, $topPosts['data']['data'] ?? [])
+    "top_posts" => $topPostsClean
 ];
+?>
+<?php
+
+// ============================================
+// BUILD HISTORICAL ARRAYS FOR AI
+// ============================================
+
+$engagementHistory = [];
+$postsHistory = [];
+$followersHistory = [];
+
+// ============================================
+// ENGAGEMENT HISTORY
+// ============================================
+
+foreach (($engagementTrend['data']['data'] ?? []) as $row) {
+
+    $engagementHistory[] = [
+        "date" => $row['date'] ?? null,
+        "engagement" => (int)($row['engagements'] ?? 0)
+    ];
+}
+
+// ============================================
+// POSTS HISTORY
+// ============================================
+
+foreach (($postsCount['data']['data'] ?? []) as $row) {
+
+    $postsHistory[] = [
+        "date" => $row['date'] ?? null,
+        "posts" => (int)($row['count'] ?? 0)
+    ];
+}
+
+// ============================================
+// FOLLOWERS HISTORY
+// ============================================
+
+foreach (($followersGrowth['data']['data'] ?? []) as $row) {
+
+    $followersHistory[] = [
+        "date" => $row['date'] ?? null,
+        "followers" => (int)($row['followers'] ?? 0)
+    ];
+}
 ?>
 
 <!DOCTYPE html>
@@ -631,11 +693,11 @@ select{
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 500px;
+    max-height: 550px;
     overflow-y: auto;
     padding: 10px;
     background: #f0f2f6;
-    height: 500px;
+    height: 550px;
 }
 
 .msg-row {
@@ -663,7 +725,6 @@ select{
     margin-right: auto;
     background: white;
     color: #111;
-    border-bottom-left-radius: 4px;
 }
 
 textarea:focus {
@@ -689,6 +750,81 @@ textarea:focus {
 .analysis-btn{
     white-space: nowrap;
 }
+
+.pretty-ai-response {
+    line-height: 1.5;
+    font-size: 0.95rem;
+    white-space: normal;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* HEADINGS */
+.pretty-ai-response h1,
+.pretty-ai-response h2,
+.pretty-ai-response h3,
+.pretty-ai-response h4 {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* PARAGRAPHS */
+.pretty-ai-response p {
+    margin: 6px 0;
+}
+
+/* LISTS */
+.pretty-ai-response ul,
+.pretty-ai-response ol {
+    margin: 6px 0 10px 18px;
+    padding-left: 16px;
+}
+
+/* LIST ITEMS */
+.pretty-ai-response li {
+    margin-bottom: 6px;
+}
+
+/* STRONG/BOLD */
+.pretty-ai-response b,
+.pretty-ai-response strong {
+    font-weight: 600;
+}
+
+/* OPTIONAL CARDS */
+.pretty-ai-response .ai-section {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    margin-bottom: 12px;
+}
+
+.quick-actions button{
+    margin: 5px 0;
+    color: #04a3ce;
+    transition: 0.15s;
+    border: solid 2px #04a3ce !important;
+    background-color: transparent !important;
+}
+
+.quick-actions button:hover{
+    font-weight: 600;
+}
+
+.btn-close-white{
+    background-color: transparent !important;
+    color: white !important;
+}
+
+button .btn-close-white:hover{
+    background-color: transparent !important;
+    color: white !important;
+}
+.btn.btn-primary{
+    transition: 0.15s;
+}
 </style>
 
 </head>
@@ -699,7 +835,7 @@ textarea:focus {
                 include 'sidebar.php';
             ?>
             <div style="width:100%;">
-                <pre id="output"></pre>
+                <!-- <pre id="output"></pre> -->
                 <div class="py-3 px-3 d-flex justify-content-between align-items-center" style="background-color:white; margin-bottom:20px;">
                     <h1 class="mb-0">Account Analytics</h1>
                     <div class="dropdown">
@@ -719,12 +855,39 @@ textarea:focus {
                 </div>
                 <div class="d-flex">
                     <div class="dashboard container container-fluid" id="dashboard">
-                        <div style="width: 53%; margin: 0px 20px 15px 10px; color: #44424d;">
-                            <a href="dashboard.php">Account Analytics</a> > <a style="color: #04a3ce !important; font-weight: bold;">Analytics Overview</a>
+                        <div>
+                            <div style="width: 53%; margin: 0px 20px 15px 10px; color: #44424d;">
+                                <a href="dashboard.php">Account Analytics</a> > <a style="color: #04a3ce !important; font-weight: bold;">Analytics Overview</a>
+                            </div>
                         </div>
                         <div class="ui-container">
                             <h2 style="color: #312b2f !important;">Analytics Overview</h2>
-                            <hr>
+                            <hr style="margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h5 style="margin: 0;">
+                                    <i class="fas fa-robot me-2" style="font-size: 18px;"></i>
+                                    <strong>AI Overview</strong>
+                                </h5>
+
+                                <div style="text-align:right;">
+                                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#aiAssistantModal" style="padding:5px 18px; border-radius:10px; font-weight:600; margin: 0;">
+                                        <i class="fas fa-magic" style="padding-right: 5px;"></i>
+                                        Open AI Insights
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="aiOverviewCard" style=" margin-top:7px; border-radius: 12px; background:#f3f4f6; border:1px solid #f3f4f6; padding:15px; line-height:1.7; color:#374151; min-height:120px;">
+
+                                <div id="aiOverviewLoading">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    Generating AI overview...
+                                </div>
+
+                                <div id="aiOverviewText" style="display:none;"></div>
+                            </div>
+                        </div>
+                        <div class="ui-container">
                             <h5><i class="fas fa-user" style="padding-right: 10px; font-size: 18px;"></i><strong>Linked Accounts</strong></h5>
                             <!-- Accounts Grid -->
                             <div id="accounts" class="mt-2"></div>
@@ -872,69 +1035,411 @@ textarea:focus {
 
                             </div>
                         </div>
-
-                        <div class="ui-container" style="margin-top:20px;">
-                            <h5>
-                                <i class="fas fa-robot" style="padding-right:10px;"></i>
-                                AI Analytics Assistant
-                            </h5>
-
-                            <div style="border: 1px solid #ddd; border-radius: 10px;">
-                                <div id="chatBox" class="chat-box"
-                                    style="border-top-left-radius: 10px; border-top-right-radius: 10px; height: 500px;"></div>
-
-                                <div style="background-color: #f0f2f6; padding: 1px 0px;
-                                            border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">
-                                    
-                                    <div style="display: flex; position: relative; margin: 5px;">
-                                        
-                                        <textarea id="postText"
-                                            class="form-control"
-                                            rows="3"
-                                            placeholder="Ask about your analytics..."
-                                            style="max-height: 85px; background-color: white;"></textarea>
-
-                                        <!-- <div style="position:absolute; top:30px; left:10px; display: flex; gap: 7px;" class="Options">
-
-                                            <button class="btn analysis-btn" data-type="summary">
-                                                Overview
-                                            </button>
-
-                                            <button class="btn analysis-btn" data-type="growth">
-                                                Growth Insights
-                                            </button>
-
-                                            <button class="btn analysis-btn" data-type="performance">
-                                                Performance Tips
-                                            </button>
-
-                                        </div> -->
-
-                                        <button onclick="getAISummary()"
-                                            class="btn btn-primary"
-                                            style="width: 95px;">
-                                            <i class="fas fa-magic"></i>
-                                        </button>
-
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         </div>                
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
+<div class="modal fade"
+     id="aiAssistantModal"
+     tabindex="-1"
+     aria-labelledby="aiAssistantModalLabel"
+     aria-hidden="true">
 
+    <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-centered">
+        <div class="modal-content" style="border-radius:8px; overflow:hidden; border:none;">
+
+            <div class="modal-header"
+                 style="background:#312b2f; color:white; border:none;">
+                <h5 class="modal-title" id="aiAssistantModalLabel">
+                    <i class="fas fa-magic" style="padding-right: 10px;"></i>
+                    AI Insights
+                </h5>
+
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body p-0" style="background:#f8fafc;">
+                <div style="display:flex; min-height:500px;">
+
+                    <div style=" width:260px; height: 600px; border-right:1px solid #e5e7eb; background:#ffffff; padding: 10px 15px; display:flex; flex-direction:column;" class="quick-actions">
+
+                        <div style="font-weight:700; color:#312b2f; margin-bottom:6px;">
+                            Quick Actions
+                        </div>
+                        <hr style="margin: 0px 0px 5px 0px;">
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('overview', 'Give me a short overview of my engagement health.')">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            Overview
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('overall_health', 'What is the overall health of my social media accounts and what should I focus on next?')">
+                            <i class="fas fa-heartbeat me-2"></i>
+                            Overall Health
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('top_posts_summary', 'Summarize my best performing posts and explain why they worked.')">
+                            <i class="fas fa-fire me-2"></i>
+                            Top Posts Summary
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('growth_insights', 'Provide insights on follower growth across connected accounts.')">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Growth Insights
+                        </button>
+                        
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('engagement_drop', 'Explain why my engagement may have changed and what the most likely causes are.')">
+                            <i class="fas fa-percent me-2"></i>
+                            Engagement Changes
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('performance_tips', 'Give me performance tips to improve engagement and follower growth.')">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            Performance Tips
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('platform_focus', 'Tell me which platform is driving most of my followers and what that means for my strategy.')">
+                            <i class="fas fa-globe me-2"></i>
+                            Platform Focus
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('follower_concentration', 'Analyze whether my followers are concentrated on one account or platform and what risks that creates.')">
+                            <i class="fas fa-users me-2"></i>
+                            Follower Concentration
+                        </button>
+
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('next_content_plan', 'Based on my current metrics and top posts, suggest what I should post next to improve results.')">
+                            <i class="fas fa-calendar-plus me-2"></i>
+                            Next Content Plan
+                        </button>
+
+                        <!-- <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('growth_momentum', 'Assess whether my account is gaining or losing momentum and explain what the trend suggests.')">
+                            <i class="fas fa-rocket me-2"></i>
+                            Growth Momentum
+                        </button> -->
+                        <!-- 
+                        <button class="btn btn-outline-primary text-start"
+                                onclick="sendPresetPrompt('account_strategy', 'Give me a strategic summary of what I should focus on next to improve growth and engagement.')">
+                            <i class="fas fa-chess-knight me-2"></i>
+                            Account Strategy
+                        </button> -->
+
+                    </div>
+
+                    <!-- RIGHT CHAT -->
+                    <div style="flex:1; display:flex; flex-direction:column; max-height: 600px;">
+                        <div id="chatBox" class="chat-box" style="flex:1; height:550px; overflow-y:auto; padding:20px;">
+                        </div>
+
+                        <div style=" background:#ffffff; padding:0px 15px;">
+                            <div style="display:flex; gap:10px; align-items:flex-end;">
+                                <textarea id="postText" class="form-control" rows="3" placeholder="Ask about your analytics..." style=" resize:none; max-height:55px; border-radius:8px; background:#f0f2f6; margin: 10px 0; border: #f0f2f6 1px solid;"></textarea>
+                                <button onclick="getAIChatInsights()" class="btn btn-primary" style=" width:70px; height:55px; border-radius:8px; ">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 </body>
+<script>
+    async function appendOverallChartMessage(canvasId, controlId, renderFn) {
+        const control = document.getElementById(controlId);
+        if (!control) return;
+
+        const previousValue = control.value;
+
+        control.value = "all";
+        renderFn();
+
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const image = canvas.toDataURL("image/png");
+
+        const chatBox = document.getElementById("chatBox");
+        const row = document.createElement("div");
+
+        row.className = "msg-row";
+        row.innerHTML = `
+            <div class="msg ai" style="background:white; padding:12px;">
+                <img src="${image}" style="width:100%; height:auto; border-radius:12px; display:block; margin: -30px 0px;">
+            </div>
+        `;
+
+        chatBox.appendChild(row);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        control.value = previousValue;
+        renderFn();
+    }
+</script>
+<script>
+    function appendChartMessage(sourceCanvasId, height = 320) {
+
+        const sourceCanvas =
+            document.getElementById(sourceCanvasId);
+
+        if (!sourceCanvas) {
+            console.log("Canvas not found:", sourceCanvasId);
+            return;
+        }
+
+        const image = sourceCanvas.toDataURL("image/png");
+
+        const chatBox =
+            document.getElementById("chatBox");
+
+        const row =
+            document.createElement("div");
+
+        row.className = "msg-row";
+
+        row.innerHTML = `
+            <div class="msg ai" style="
+                background:white;
+                padding:12px;max-width:300px;
+            ">
+                <img
+                    src="${image}"
+                    style="
+                        width:100%;
+                        height:auto;
+                        border-radius:12px;
+                        display:block;
+                        margin: -50px 0px;
+                    "
+                >
+            </div>
+        `;
+
+        chatBox.appendChild(row);
+
+        chatBox.scrollTop =
+            chatBox.scrollHeight;
+    }
+
+    function typeAIResponse(element, html, speed = 15) {
+
+        let index = 0;
+
+        element.innerHTML = "";
+
+        const parser = document.createElement("div");
+        parser.innerHTML = html;
+
+        const finalHTML = parser.innerHTML;
+
+        const interval = setInterval(() => {
+
+            index++;
+
+            element.innerHTML = finalHTML.slice(0, index);
+
+            const chatBox = document.getElementById("chatBox");
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            if (index >= finalHTML.length) {
+
+                clearInterval(interval);
+
+                element.innerHTML = finalHTML;
+            }
+
+        }, speed);
+    }
+
+    let accountNamesMap = {};
+
+    const TOP_POSTS = <?= json_encode($topPostsClean) ?>;
+
+    function appendTopPostEmbed() {
+        if (!TOP_POSTS.length) return;
+
+        const topPost = TOP_POSTS[0];
+
+        const url =
+            topPost.permalink ||
+            topPost.url ||
+            "";
+
+        if (!url) return;
+
+        const chatBox = document.getElementById("chatBox");
+
+        const row = document.createElement("div");
+
+        row.className = "msg-row";
+
+        row.innerHTML = `
+            <div class="msg ai" style="
+                max-width:650px;
+                padding:10px;
+                background:white;
+                white-space: normal !important;
+            ">
+                <div style="
+                    font-size:14px;
+                    font-weight:600;
+                    color:#6b7280;
+                    margin-bottom:8px;
+                    white-space: normal !important;
+                ">
+                    Top Performing Post
+                </div>
+
+                <iframe
+                    src="${url.includes('/status/')
+                        ? `https://platform.twitter.com/embed/Tweet.html?id=${extractTweetId(url)}`
+                        : url}"
+                    style="
+                        width:100%;
+                        min-height:500px;
+                        border:0;
+                        border-radius:10px;
+                    "
+                    loading="lazy">
+                </iframe>
+            </div>
+        `;
+
+        chatBox.appendChild(row);
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function extractTweetId(url) {
+
+        const match = url.match(/status\/(\d+)/);
+
+        return match ? match[1] : "";
+    }
+
+    async function generateAIOverview() {
+
+        const loadingEl = document.getElementById("aiOverviewLoading");
+        const textEl = document.getElementById("aiOverviewText");
+
+        try {
+
+            const prompt = `
+                Analyze the overall social media health based on:
+
+                - Posts last 7 days: ${AI_METRICS.posts_last_7_days}
+                - Engagement last 7 days: ${AI_METRICS.engagement_last_7_days}
+                - Engagement rate: ${AI_METRICS.engagement_rate}%
+                - Post growth change: ${AI_METRICS.posts_change}%
+                - Engagement growth change: ${AI_METRICS.engagement_change}%
+                - Engagement rate change: ${AI_METRICS.rate_change}%
+
+                Write ONE short professional paragraph.
+                Mention:
+                - overall health
+                - engagement trend
+                - consistency
+                - one recommendation
+
+                Keep under 90 words.
+            `;
+
+            const res = await fetch("ai_analysis_chat.php", {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    text: prompt,
+                    metrics: AI_METRICS,
+                    type: "overview"
+                })
+            });
+
+            const data = await res.json();
+
+            loadingEl.style.display = "none";
+
+            textEl.style.display = "block";
+
+            const formatted =
+                formatAIText(
+                    data.summary || "No overview generated."
+                );
+
+            textEl.innerHTML = `
+                <div id="overviewTyping" style="
+                    font-size:15px;
+                    color:#374151;
+                "></div>
+            `;
+
+            const typingEl =
+                document.getElementById("overviewTyping");
+
+            typeAIResponse(
+                typingEl,
+                formatted,
+                1
+            );
+
+        } catch (err) {
+
+            console.error(err);
+
+            loadingEl.innerHTML = `
+                <span style="color:red;">
+                    Failed to generate AI overview.
+                </span>
+            `;
+        }
+    }
+
+    function appendUserMessage(text) {
+        const chatBox = document.getElementById("chatBox");
+
+        const userMsg = document.createElement("div");
+        userMsg.className = "msg-row";
+        userMsg.innerHTML = `<div class="msg user">${escapeHtml(text)}</div>`;
+
+        chatBox.appendChild(userMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+async function sendPresetPrompt(presetKey, promptText) {
+    const postText = document.getElementById("postText");
+    postText.value = promptText;
+
+    await getAIChatInsights(promptText, presetKey);
+}
+</script>
 <script>
 const loadingEl = showLoading(chatBox);
 
 const AI_METRICS = {
+
+    // =====================================
+    // CURRENT SNAPSHOT
+    // =====================================
     posts_last_7_days: <?= $currentPosts ?>,
     engagement_last_7_days: <?= $currentEngagement ?>,
     engagement_rate: <?= $currentRate ?>,
@@ -944,10 +1449,30 @@ const AI_METRICS = {
     rate_change: <?= $rateChange ?>,
 
     followers_total: <?= $followers['data']['data']['total_followers'] ?? 0 ?>,
-    followers_by_account: <?= json_encode($followersByAccount) ?>,
 
-    platform_distribution: {}, // filled later
-    top_posts_count: <?= count($topPosts['data']['data'] ?? []) ?>
+    followers_by_account:
+        <?= json_encode($followersByAccount) ?>,
+
+    platform_distribution: {},
+
+    top_posts_count:
+        <?= count($topPosts['data']['data'] ?? []) ?>,
+
+    top_posts:
+        <?= json_encode($topPostsClean) ?>,
+
+    // =====================================
+    // HISTORICAL DATA
+    // =====================================
+
+    engagement_history:
+        <?= json_encode($engagementHistory) ?>,
+
+    posts_history:
+        <?= json_encode($postsHistory) ?>,
+
+    followers_history:
+        <?= json_encode($followersHistory) ?>
 };
 
 function escapeHtml(text) {
@@ -985,82 +1510,495 @@ function formatAIText(text) {
 
     return html;
 }
+async function getAIChatInsights(forcedPrompt = null, presetKey = null) {
 
-async function getAISummary(type = "general") {
-    console.log("🚀 getAISummary FIRED");
-    console.log("AI_METRICS:", AI_METRICS);
-    console.log("postText element:", document.getElementById("postText"));
-    console.log("chatBox element:", document.getElementById("chatBox"));
-
-    const postText = document.getElementById("postText").value.trim();
+    const postTextEl = document.getElementById("postText");
     const chatBox = document.getElementById("chatBox");
+    const outputEl = document.getElementById("output");
 
-    const finalPrompt = postText || "Analyze my social media analytics";
+    const finalPrompt =
+        (forcedPrompt || postTextEl.value || "").trim() ||
+        "Analyze my social media analytics";
 
-    // user message
-    const userMsg = document.createElement("div");
-    userMsg.className = "msg-row";
-    userMsg.innerHTML = `<div class="msg user">${escapeHtml(finalPrompt)}</div>`;
-    chatBox.appendChild(userMsg);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    appendUserMessage(finalPrompt);
+
+    // =====================================
+    // BASE PAYLOAD
+    // =====================================
+    const payload = {
+        type: "chat_insights",
+        text: finalPrompt,
+        preset_key: presetKey || null,
+        prompt_source: presetKey ? "preset" : "manual"
+    };
+
+    // =====================================
+    // FULL METRICS TEMPLATE
+    // =====================================
+    const fullMetrics = {
+        posts_last_7_days: AI_METRICS.posts_last_7_days,
+        engagement_last_7_days:AI_METRICS.engagement_last_7_days,
+        engagement_rate:AI_METRICS.engagement_rate,
+        posts_change:AI_METRICS.posts_change,
+        engagement_change:AI_METRICS.engagement_change,
+        rate_change:AI_METRICS.rate_change,
+        followers_total:AI_METRICS.followers_total,
+        followers_by_account:AI_METRICS.followers_by_account,
+        platform_distribution:AI_METRICS.platform_distribution,
+        top_posts:AI_METRICS.top_posts,
+
+        engagement_history:AI_METRICS.engagement_history,
+        posts_history:AI_METRICS.posts_history,
+        followers_history:AI_METRICS.followers_history
+    };
+
+    const topPosts =
+        AI_METRICS.top_posts ||
+        window.TOP_POSTS ||
+        [];
+
+    // =====================================
+    // UNIQUE PAYLOADS PER OPTION
+    // =====================================
+
+    switch (presetKey) {
+
+        // =================================
+        // OVERVIEW
+        // =================================
+        case "overview":
+
+            payload.metrics = {
+                posts_last_7_days:
+                    AI_METRICS.posts_last_7_days,
+
+                engagement_last_7_days:
+                    AI_METRICS.engagement_last_7_days,
+
+                engagement_rate:
+                    AI_METRICS.engagement_rate,
+
+                posts_change:
+                    AI_METRICS.posts_change,
+
+                engagement_change:
+                    AI_METRICS.engagement_change,
+
+                rate_change:
+                    AI_METRICS.rate_change,
+
+                followers_total:
+                    AI_METRICS.followers_total,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution,
+
+                top_posts:
+                    AI_METRICS.top_posts
+            };
+
+            break;
+
+        // =================================
+        // OVERALL HEALTH
+        // =================================
+        case "overall_health":
+
+            payload.metrics = {
+                posts_last_7_days:
+                    AI_METRICS.posts_last_7_days,
+
+                engagement_last_7_days:
+                    AI_METRICS.engagement_last_7_days,
+
+                engagement_rate:
+                    AI_METRICS.engagement_rate,
+
+                posts_change:
+                    AI_METRICS.posts_change,
+
+                engagement_change:
+                    AI_METRICS.engagement_change,
+
+                rate_change:
+                    AI_METRICS.rate_change,
+
+                followers_total:
+                    AI_METRICS.followers_total,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account
+            };
+
+            break;
+
+        // =================================
+        // GROWTH INSIGHTS
+        // =================================
+        case "growth_insights":
+
+            payload.metrics = {
+                followers_total:
+                    AI_METRICS.followers_total,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                followers_history:
+                    AI_METRICS.followers_history
+            };
+
+            break;
+
+        // =================================
+        // PERFORMANCE TIPS
+        // =================================
+        case "performance_tips":
+
+            payload.metrics = {
+                posts_last_7_days:
+                    AI_METRICS.posts_last_7_days,
+
+                engagement_last_7_days:
+                    AI_METRICS.engagement_last_7_days,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution,
+
+                top_posts:
+                    AI_METRICS.top_posts
+            };
+
+            break;
+
+        // =================================
+        // PLATFORM FOCUS
+        // =================================
+        case "platform_focus":
+
+            payload.metrics = {
+                followers_total:
+                    AI_METRICS.followers_total,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution,
+
+                top_posts:
+                    AI_METRICS.top_posts
+            };
+
+            break;
+
+        // =================================
+        // ENGAGEMENT DROP
+        // =================================
+        case "engagement_drop":
+
+            payload.metrics = {
+                engagement_last_7_days:
+                    AI_METRICS.engagement_last_7_days,
+
+                engagement_rate:
+                    AI_METRICS.engagement_rate,
+
+                posts_change:
+                    AI_METRICS.posts_change,
+
+                engagement_change:
+                    AI_METRICS.engagement_change,
+
+                rate_change:
+                    AI_METRICS.rate_change,
+
+                engagement_history:
+                    AI_METRICS.engagement_history
+            };
+
+            break;
+
+        // =================================
+        // FOLLOWER CONCENTRATION
+        // =================================
+        case "follower_concentration":
+
+            payload.metrics = {
+                followers_total:
+                    AI_METRICS.followers_total,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution
+            };
+
+            break;
+
+        // =================================
+        // GROWTH MOMENTUM
+        // =================================
+        case "growth_momentum":
+
+            payload.metrics = {
+                posts_change:
+                    AI_METRICS.posts_change,
+
+                engagement_change:
+                    AI_METRICS.engagement_change,
+
+                followers_total:
+                    AI_METRICS.followers_total,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution,
+
+                engagement_history:
+                    AI_METRICS.engagement_history,
+
+                posts_history:
+                    AI_METRICS.posts_history,
+
+                followers_history:
+                    AI_METRICS.followers_history
+            };
+
+            break;
+
+        // =================================
+        // ACCOUNT STRATEGY
+        // =================================
+        case "account_strategy":
+
+            payload.metrics = {
+                posts_last_7_days:
+                    AI_METRICS.posts_last_7_days,
+
+                engagement_last_7_days:
+                    AI_METRICS.engagement_last_7_days,
+
+                posts_change:
+                    AI_METRICS.posts_change,
+
+                engagement_change:
+                    AI_METRICS.engagement_change,
+
+                rate_change:
+                    AI_METRICS.rate_change,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution,
+
+                top_posts:
+                    AI_METRICS.top_posts
+            };
+
+            break;
+
+        // =================================
+        // TOP POSTS SUMMARY
+        // =================================
+        case "top_posts_summary":
+
+            payload.top_posts = topPosts;
+
+            break;
+
+        // =================================
+        // NEXT CONTENT PLAN
+        // =================================
+        case "next_content_plan":
+
+            payload.metrics = {
+                posts_last_7_days:
+                    AI_METRICS.posts_last_7_days,
+
+                engagement_last_7_days:
+                    AI_METRICS.engagement_last_7_days,
+
+                followers_by_account:
+                    AI_METRICS.followers_by_account,
+
+                platform_distribution:
+                    AI_METRICS.platform_distribution,
+
+                top_posts:
+                    AI_METRICS.top_posts
+            };
+
+            payload.top_posts = topPosts;
+
+            break;
+
+        // =================================
+        // DEFAULT CHAT
+        // =================================
+        default:
+
+            payload.metrics = {
+                ...fullMetrics
+            };
+
+            payload.top_posts = topPosts;
+
+            break;
+    }
+
+    console.log(
+        "Sending to ai_analysis_chat.php:",
+        payload
+    );
+
+    if (outputEl) {
+
+        outputEl.textContent =
+            JSON.stringify(payload, null, 2);
+
+    }
 
     const loadingEl = showLoading(chatBox);
 
     try {
-        const res = await fetch("ai_analysis_chat.php", {   // ✅ FIX NAME HERE
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                text: finalPrompt,
-                metrics: AI_METRICS,
-                embed: "",
-                replies: [],
-                type: type
-            })
-        });
+
+        const res = await fetch(
+            "ai_analysis_chat.php",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            }
+        );
 
         const raw = await res.text();
-        console.log("AI RAW RESPONSE:", raw);
+
         let data;
 
         try {
+
             data = JSON.parse(raw);
+
+            console.log("PROMPT SENT TO AI:");
+            console.log(data.debug?.prompt_sent);
+
+            console.log("FULL DEBUG:");
+            console.log(data.debug);
+
         } catch (e) {
-            console.error("Invalid JSON from server:", raw);
-            throw new Error("Server did not return JSON");
+
+            console.error(raw);
+
+            throw new Error(
+                "Server did not return JSON"
+            );
+
         }
 
         loadingEl.remove();
 
-        const output = data.summary || "No response returned.";
+        const output =
+            data.summary ||
+            data.response ||
+            "No response returned.";
 
         const aiMsg = document.createElement("div");
-        aiMsg.className = "msg-row";
-        aiMsg.innerHTML = `
-            <div class="msg ai">
-                ${formatAIText(output)}
-            </div>
-        `;
 
+        aiMsg.className = "msg-row";
+
+        const aiBubble = document.createElement("div");
+
+        aiBubble.className = "msg ai pretty-ai-response";
+
+        aiMsg.appendChild(aiBubble);
+
+
+        // typing animation
+        typeAIResponse(
+            aiBubble,
+            output,
+            1 // typing speed (smaller = faster)
+        );
+
+        if (presetKey === "top_posts_summary") {
+    appendTopPostEmbed();
+        }
+
+        if (presetKey === "growth_insights") {
+            await appendOverallChartMessage(
+                "followersGrowthChart",
+                "timeRange",
+                renderFollowersGrowthChart
+            );
+        }
+
+        if (presetKey === "engagement_drop" || presetKey === "growth_momentum") {
+            await appendOverallChartMessage(
+                "engagementTrendChart",
+                "engagementRange",
+                renderEngagementTrendChart
+            );
+        }
+
+        if (
+            presetKey === "platform_focus"
+        ) {
+
+            appendChartMessage(
+                "platformPieChart"
+            );
+        }
+
+         if (
+            presetKey === "follower_concentration"
+        ) {
+
+            appendChartMessage(
+                "followersPieChart"
+            );
+        }
+        
         chatBox.appendChild(aiMsg);
-        chatBox.scrollTop = chatBox.scrollHeight;
+
+        chatBox.scrollTop =
+            chatBox.scrollHeight;
+
+        postTextEl.value = "";
 
     } catch (err) {
 
         console.error(err);
+
         loadingEl.remove();
 
-        const errorMsg = document.createElement("div");
+        const errorMsg =
+            document.createElement("div");
+
         errorMsg.className = "msg-row";
+
         errorMsg.innerHTML = `
-            <div class="msg ai" style="color:red;">
+            <div class="msg ai text-danger">
+                <i class="fa-solid fa-circle-exclamation me-2"></i>
                 AI request failed. Check console.
             </div>
         `;
 
         chatBox.appendChild(errorMsg);
+
     }
 }
 
@@ -1209,7 +2147,6 @@ function showLoading(chatBox) {
 </script>
 <script>
 const followersByAccountData = <?= json_encode($followersByAccount) ?>;
-let accountNamesMap = {};
 let platformPieChart = null;
 let platformFollowersMap = {};
 
@@ -1239,14 +2176,14 @@ function renderFollowersTable() {
     const currentTotal = <?= $followers['data']['data']['total_followers'] ?? 0 ?>;
 
     // ============================================
-    // SORT DATA
+    // SORT DATA (OLDEST -> NEWEST)
     // ============================================
     const sortedData = [...followersGrowthData].sort((a, b) => {
         return new Date(a.date) - new Date(b.date);
     });
 
     // ============================================
-    // LAST 7 DAYS
+    // LAST 7 DAYS (NEWEST -> OLDEST FOR DISPLAY)
     // ============================================
     const last7 = sortedData.slice(-7).reverse();
 
@@ -1254,13 +2191,15 @@ function renderFollowersTable() {
     // REBUILD TOTALS
     // ============================================
     let runningTotal = currentTotal;
-    const totals = [];
 
-    for (let i = last7.length - 1; i >= 0; i--) {
-        const change = Number(last7[i].total_followers) || 0;
-        runningTotal -= change;
-        totals.unshift(runningTotal + change);
-    }
+    const totals = last7.map(row => {
+
+        const total = runningTotal;
+
+        runningTotal -= Number(row.total_followers) || 0;
+
+        return total;
+    });
 
     // ============================================
     // SUMMARY
@@ -1269,10 +2208,10 @@ function renderFollowersTable() {
         return sum + (Number(row.total_followers) || 0);
     }, 0);
 
-    const latestTotal = totals[totals.length - 1] || currentTotal;
+    const latestTotal = currentTotal;
 
     // ============================================
-    // 🔥 HEADER + SUMMARY ROW (COMBINED)
+    // HEADER + SUMMARY ROW
     // ============================================
     const summaryRow = document.createElement("tr");
 
@@ -1288,13 +2227,20 @@ function renderFollowersTable() {
 
         <td style="padding: 5px 10px; text-align:center; background-color: #f3f4f6;">
             <div style="font-size:12px; color:#555;">Total Followers</div>
-            <div style="font-size:22px;">${latestTotal.toLocaleString()}</div>
+            <div style="font-size:22px;">
+                ${latestTotal.toLocaleString()}
+            </div>
         </td>
 
         <td style="padding: 5px 10px; text-align:center; background-color: #f3f4f6;">
             <div style="font-size:12px; color:#555;">Net Change</div>
-            <div style="font-size:22px; color:${totalNet >= 0 ? 'green' : 'red'};">
-                ${totalNet >= 0 ? '+' : ''}${totalNet.toLocaleString()}
+
+            <div style="
+                font-size:22px;
+                color:${totalNet >= 0 ? 'green' : 'red'};
+            ">
+                ${totalNet >= 0 ? '+' : ''}
+                ${totalNet.toLocaleString()}
             </div>
         </td>
     `;
@@ -1309,6 +2255,7 @@ function renderFollowersTable() {
         const date = formatFullDate(row.date);
 
         const net = Number(row.total_followers) || 0;
+
         const total = totals[index];
 
         const tr = document.createElement("tr");
@@ -1317,14 +2264,31 @@ function renderFollowersTable() {
         tr.style.border = "1px solid #e5e7eb";
 
         tr.innerHTML = `
-            <td style="padding:6px 10px; color: #6d6874; font-size: 15px;">${date}</td>
+            <td style="
+                padding:6px 10px;
+                color:#6d6874;
+                font-size:15px;
+            ">
+                ${date}
+            </td>
 
-            <td style="padding:6px 10px; color: #6d6874; text-align:center; font-size: 15px;">
+            <td style="
+                padding:6px 10px;
+                color:#6d6874;
+                text-align:center;
+                font-size:15px;
+            ">
                 ${total.toLocaleString()}
             </td>
 
-            <td style="padding:6px 10px; text-align:center; color:${net >= 0 ? 'green' : 'red'}; font-size: 15px;">
-                ${net >= 0 ? '+' : ''}${net.toLocaleString()}
+            <td style="
+                padding:6px 10px;
+                text-align:center;
+                color:${net >= 0 ? 'green' : 'red'};
+                font-size:15px;
+            ">
+                ${net >= 0 ? '+' : ''}
+                ${net.toLocaleString()}
             </td>
         `;
 
@@ -1908,6 +2872,25 @@ async function loadAccounts() {
         accountsDiv.innerHTML = "Error loading accounts.";
     }
 
+    // =====================================
+    // CONVERT IDS -> ACCOUNT NAMES
+    // =====================================
+    const namedFollowersMap = {};
+
+    Object.entries(followersMap).forEach(([id, count]) => {
+
+        const accountName =
+            accountNamesMap[String(id)] ||
+            `Account ${id}`;
+
+        namedFollowersMap[accountName] = count;
+    });
+
+    // =====================================
+    // SAVE TO AI METRICS
+    // =====================================
+    AI_METRICS.followers_by_account = namedFollowersMap;
+
     AI_METRICS.platform_distribution = platformFollowersMap;
 }
 
@@ -1915,6 +2898,7 @@ async function loadAccounts() {
 // INIT
 // =============================
 window.onload = async () => {
+    await generateAIOverview();
     await loadAccounts();
 
     renderFollowersGrowthChart();

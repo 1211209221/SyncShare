@@ -38,26 +38,54 @@ if (isset($_SESSION['token'])) {
 
 // Fetch helper
 function fetchPosts($token, $type = 'scheduled') {
-    $url = "https://socialbu.com/api/v1/posts?type=$type";
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => [
-            "Authorization: Bearer $token",
-            "Accept: application/json"
-        ]
-    ]);
-    $response = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
-    if ($code === 200) {
+    $allPosts = [];
+    $page = 1;
+    $perPage = 100;
+
+    while (true) {
+
+        $url = "https://socialbu.com/api/v1/posts?" . http_build_query([
+            'type' => $type,
+            'page' => $page,
+            'perPage' => $perPage
+        ]);
+
+        $ch = curl_init($url);
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer $token",
+                "Accept: application/json"
+            ]
+        ]);
+
+        $response = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 200) {
+            return [];
+        }
+
         $data = json_decode($response, true);
-        return $data['items'] ?? [];
-    } else {
-        echo "<div class='alert alert-danger'>❌ Failed to fetch $type posts. HTTP $code<br><pre>$response</pre></div>";
-        return [];
+        $items = $data['items'] ?? [];
+
+        if (empty($items)) {
+            break;
+        }
+
+        $allPosts = array_merge($allPosts, $items);
+
+        if (count($items) < $perPage) {
+            break;
+        }
+
+        $page++;
     }
+
+    return $allPosts;
 }
 
 // Get account details by ID
@@ -133,15 +161,13 @@ body {
     border-radius: 8px;
     padding: 15px;
     background: #f3f4f6;
-    transition: 0.2s;
+    transition: 0.15s;
 }
 
 .post-card:hover{
-    transform: scale(1.02);
     background-color: #e2e1e7;
     cursor: pointer;
     color: #53515f;
-
 }
 
 .post-header {
@@ -364,11 +390,13 @@ button.add-account:hover {
 .post-images img {
     width: 100%;
     height: 100%;
-    object-fit: cover;        /* 🔥 crops instead of stretching */
-    object-position: center;  /* center the crop */
+    object-fit: cover;
+    object-position: center;
     border-radius: 6px;
     border: 1px solid #f3f4f6;
     background: white;
+
+    display: block;
 }
 </style>
 </head>
@@ -541,9 +569,9 @@ button.add-account:hover {
 
                                 <div class="post-images <?= $gridClass ?>">
                                     <?php if ($imageCount > 0): ?>
-                                        <?php foreach ($validImages as $url): ?>
+                                        <?php foreach (array_slice($validImages, 0, 4) as $url): ?>
                                             <div href="<?= htmlspecialchars($url) ?>" target="_blank">
-                                                <img src="<?= htmlspecialchars($url) ?>">
+                                                <img src="<?= htmlspecialchars($url) ?>" loading="<?= $index < 2 ? 'eager' : 'lazy' ?>" decoding="async" draggable="false">
                                             </div>
                                         <?php endforeach; ?>
                                     <?php else: ?>
@@ -578,79 +606,130 @@ button.add-account:hover {
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('accountSearch');
-    const filterSelect = document.getElementById('accountFilter');
-    const statusFilter = document.getElementById('statusFilter');
-    const postCards = document.querySelectorAll('.accounts-grid .post-card');
+    document.addEventListener('DOMContentLoaded', () => {
 
-    function getPlatformIcon(platform) {
-        switch (platform) {
-            case 'twitter':
-                return '<i class="fab fa-twitter"></i>';
-            case 'facebook':
-                return '<i class="fab fa-facebook"></i>';
-            case 'instagram':
-                return '<i class="fab fa-instagram"></i>';
-            case 'linkedin':
-                return '<i class="fab fa-linkedin"></i>';
-            case 'mastodon':
-                return '<i class="fab fa-mastodon"></i>';
-            default:
-                return '<i class="fas fa-share"></i>';
+        const searchInput = document.getElementById('accountSearch');
+        const filterSelect = document.getElementById('accountFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        const noResults = document.getElementById('noResultsMessage');
+
+        const postCards = [...document.querySelectorAll('.accounts-grid .post-card')];
+
+        function normalizePlatform(platform) {
+
+            if (platform.includes('twitter')) return 'twitter';
+            if (platform.includes('mastodon')) return 'mastodon';
+            if (platform.includes('facebook')) return 'facebook';
+            if (platform.includes('instagram')) return 'instagram';
+            if (platform.includes('linkedin')) return 'linkedin';
+
+            return platform;
         }
-    }
 
-    function filterPosts() {
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        const selectedPlatform = filterSelect.value.toLowerCase();
-        let anyVisible = false;
+        function getPlatformIcon(platform) {
 
+            switch (platform) {
+
+                case 'twitter':
+                    return '<i class="fab fa-twitter"></i>';
+
+                case 'facebook':
+                    return '<i class="fab fa-facebook"></i>';
+
+                case 'instagram':
+                    return '<i class="fab fa-instagram"></i>';
+
+                case 'linkedin':
+                    return '<i class="fab fa-linkedin"></i>';
+
+                case 'mastodon':
+                    return '<i class="fab fa-mastodon"></i>';
+
+                default:
+                    return '<i class="fas fa-share"></i>';
+            }
+        }
+
+        // PREPROCESS EVERYTHING ONCE
         postCards.forEach(card => {
-            const content = card.querySelector('strong')?.textContent.toLowerCase() || '';
+
+            const strong = card.querySelector('strong');
             const platformElement = card.querySelector('.platform-tag');
-            let platformTag = platformElement?.textContent.toLowerCase().trim() || '';
 
-            // Normalize platform
-            if (platformTag.includes('twitter')) platformTag = 'twitter';
-            else if (platformTag.includes('mastodon')) platformTag = 'mastodon';
-            else if (platformTag.includes('facebook')) platformTag = 'facebook';
-            else if (platformTag.includes('instagram')) platformTag = 'instagram';
-            else if (platformTag.includes('linkedin')) platformTag = 'linkedin';
+            const content =
+                strong?.textContent.toLowerCase() || '';
 
-            // Inject icon (only once)
-            if (platformElement && !platformElement.dataset.iconInjected) {
-                platformElement.innerHTML = getPlatformIcon(platformTag) + platformElement.textContent;
-                platformElement.dataset.iconInjected = "true";
+            let platform =
+                platformElement?.textContent.toLowerCase().trim() || '';
+
+            platform = normalizePlatform(platform);
+
+            card.dataset.content = content;
+            card.dataset.platform = platform;
+            card.dataset.status = (card.dataset.status || '').toLowerCase();
+
+            // Inject icon once only
+            if (platformElement) {
+
+                platformElement.innerHTML =
+                    getPlatformIcon(platform) + ' ' + platformElement.textContent;
+
             }
 
-            const matchesSearch = content.includes(searchTerm);
-            const status = card.dataset.status || '';
-            const selectedStatus = statusFilter.value.toLowerCase();
-
-            const matchesPlatform = selectedPlatform === '' || platformTag === selectedPlatform;
-            const matchesStatus = selectedStatus === '' || status === selectedStatus;
-
-            if (matchesSearch && matchesPlatform && matchesStatus){
-                card.classList.remove('hidden');
-                anyVisible = true;
-            } else {
-                card.classList.add('hidden');
-            }
         });
 
-        document.getElementById('noResultsMessage').style.display = anyVisible ? 'none' : 'block';
-    }
+        function filterPosts() {
 
-    searchInput.addEventListener('input', filterPosts);
-    filterSelect.addEventListener('change', filterPosts);
-    statusFilter.addEventListener('change', filterPosts);
+            const searchTerm =
+                searchInput.value.toLowerCase().trim();
 
-    filterPosts(); // run once on load
-});
+            const selectedPlatform =
+                filterSelect.value.toLowerCase();
+
+            const selectedStatus =
+                statusFilter.value.toLowerCase();
+
+            let anyVisible = false;
+
+            for (const card of postCards) {
+
+                const matchesSearch =
+                    card.dataset.content.includes(searchTerm);
+
+                const matchesPlatform =
+                    !selectedPlatform ||
+                    card.dataset.platform === selectedPlatform;
+
+                const matchesStatus =
+                    !selectedStatus ||
+                    card.dataset.status === selectedStatus;
+
+                const visible =
+                    matchesSearch &&
+                    matchesPlatform &&
+                    matchesStatus;
+
+                card.classList.toggle('hidden', !visible);
+
+                if (visible) {
+                    anyVisible = true;
+                }
+            }
+
+            noResults.style.display =
+                anyVisible ? 'none' : 'block';
+        }
+
+        // FILTER EVENTS
+        searchInput.addEventListener('input', filterPosts);
+        filterSelect.addEventListener('change', filterPosts);
+        statusFilter.addEventListener('change', filterPosts);
+
+        // INITIAL RUN
+        filterPosts();
+
+    });
 </script>
-
-
 </body>
 
 </html>

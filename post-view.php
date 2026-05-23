@@ -953,6 +953,8 @@ a.btn-outline-secondary:hover{
     background: white;
     color: #111;
     border-bottom-left-radius: 4px;
+    padding-top: 10px;
+    padding-bottom: 10px;
 }
 
 textarea:focus {
@@ -1263,7 +1265,7 @@ textarea:focus {
                                                         <textarea id="postText" class="form-control" rows="5" placeholder="Paste post content here..." style="max-height: 85px; background-color: white !important; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px;"></textarea>
                                                         <div style="margin-bottom:10px; position: absolute; top: 40px; left: 10px;" class="Options">
                                                             <button type="button" class="btn btn-outline-primary analysis-btn" data-type="summary" style="font-size: 13px; background-color: transparent !important;">
-                                                                Short Summary
+                                                                Summary
                                                             </button>
 
                                                             <?php if ($status !== 'scheduled' && $status === 'published' && !empty($url)): ?>
@@ -1641,6 +1643,63 @@ function escapeHtml(text) {
 }
 </script> -->
 <script>
+    function typeAIResponse(element, text, speed = 4) {
+
+    let i = 0;
+
+    let current = "";
+
+    const formattedFull =
+        formatAIText(text);
+
+    const temp =
+        document.createElement("div");
+
+    temp.innerHTML = formattedFull;
+
+    const finalHTML =
+        temp.innerHTML;
+
+    function type() {
+
+        if (i >= finalHTML.length) return;
+
+        // preserve HTML tags instantly
+        if (finalHTML[i] === "<") {
+
+            const close =
+                finalHTML.indexOf(">", i);
+
+            if (close !== -1) {
+
+                current +=
+                    finalHTML.slice(i, close + 1);
+
+                i = close + 1;
+
+            }
+
+        } else {
+
+            current += finalHTML[i];
+
+            i++;
+        }
+
+        element.innerHTML = current;
+
+        const chatBox =
+            document.getElementById("chatBox");
+
+        chatBox.scrollTop =
+            chatBox.scrollHeight;
+
+        setTimeout(type, speed);
+    }
+
+    type();
+}
+
 async function getAISummary() {
 
     const postText = document.getElementById("postText").value.trim();
@@ -1691,14 +1750,24 @@ async function getAISummary() {
         }
 
         const aiMsg = document.createElement("div");
+
         aiMsg.className = "msg-row";
-        aiMsg.innerHTML = `
-            <div class="msg ai">
-                ${formatAIText(output)}
-            </div>
-        `;
+
+        const aiBubble = document.createElement("div");
+
+        aiBubble.className = "msg ai";
+
+        aiMsg.appendChild(aiBubble);
 
         chatBox.appendChild(aiMsg);
+
+        // typing animation
+        typeAIResponse(
+            aiBubble,
+            output,
+            1 // speed
+        );
+
         chatBox.scrollTop = chatBox.scrollHeight;
 
     } catch (err) {
