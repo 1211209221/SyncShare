@@ -335,6 +335,11 @@
 						<i class="fas fa-chart-line"></i> Account Analytics
 					</a>
 				</li>
+				<li class="nav-item">
+					<a class="nav-link <?php if (basename($_SERVER['PHP_SELF']) == 'ai-content-studio.php'): ?> active <?php endif; ?>" href="ai-content-studio.php">
+						<i class="fas fa-magic"></i> AI Content Studio
+					</a>
+				</li>
 			</ul>
 		</div>
 	</nav>

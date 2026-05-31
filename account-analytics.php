@@ -275,15 +275,14 @@ $rateChange = percentChange($currentRate, $prevRate);
 // =====================================================
 function quickFetch($url) {
     $ch = curl_init($url);
-
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 10
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "User-Agent: Mozilla/5.0"
     ]);
-
     $res = curl_exec($ch);
     curl_close($ch);
-
     return json_decode($res, true);
 }
 
@@ -1004,7 +1003,7 @@ button .btn-close-white:hover{
                                 <canvas id="engagementTrendChart"></canvas>
                             </div>
                         </div>
-                        <div class="ui-container">
+                        <div class="ui-container" style="max-width: 1220px;">
                             <h5><i class="fas fa-fire" style="padding-right: 10px; font-size: 18px; margin-bottom: 15px;"></i>Top Performing Posts</h5>
                             <div class="horizontal-scroll">
                                 <?php if ($topPosts['http_code'] === 200 && !empty($topPosts['data']['data'])): ?>

@@ -35,6 +35,12 @@ if (isset($_SESSION['token'])) {
     }
 }
 
+$search   = trim($_GET['search'] ?? '');
+$platform = trim($_GET['platform'] ?? '');
+$status   = trim($_GET['status'] ?? '');
+$page     = max(1, (int)($_GET['page'] ?? 1));
+
+$POSTS_PER_PAGE = 8;
 
 // Fetch helper
 function fetchPosts($token, $type = 'scheduled') {
@@ -134,13 +140,162 @@ $draftPosts = fetchPosts($token, 'draft');
 $scheduledPosts = fetchPosts($token, 'scheduled');
 $publishedPosts = fetchPosts($token, 'published');
 $posts = array_merge($draftPosts, $scheduledPosts, $publishedPosts);
+// COUNTERS
+$platformCounts = [
+    'instagram' => 0,
+    'twitter' => 0,
+    'facebook' => 0,
+    'linkedin' => 0,
+    'mastodon' => 0
+];
+
+$statusCounts = [
+    'draft' => 0,
+    'scheduled' => 0,
+    'published' => 0
+];
+
+foreach ($posts as $post) {
+
+    // PLATFORM
+    $accountType = strtolower(
+        $post['account_type']
+        ?? $post['type']
+        ?? ''
+    );
+
+    if (str_contains($accountType, 'twitter')) {
+        $platformCounts['twitter']++;
+
+    } elseif (str_contains($accountType, 'instagram')) {
+        $platformCounts['instagram']++;
+
+    } elseif (str_contains($accountType, 'facebook')) {
+        $platformCounts['facebook']++;
+
+    } elseif (str_contains($accountType, 'linkedin')) {
+        $platformCounts['linkedin']++;
+
+    } elseif (str_contains($accountType, 'mastodon')) {
+        $platformCounts['mastodon']++;
+    }
+
+    // STATUS
+    if (!empty($post['draft'])) {
+        $statusCounts['draft']++;
+
+    } elseif (!empty($post['published'])) {
+        $statusCounts['published']++;
+
+    } else {
+        $statusCounts['scheduled']++;
+    }
+}
+$posts = array_filter($posts, function($post) use ($search, $platform, $status) {
+
+    $content = strtolower(trim(strip_tags($post['content'] ?? '')));
+
+    // FIX PLATFORM DETECTION
+    $accountType =
+        strtolower(
+            $post['account_type']
+            ?? $post['type']
+            ?? ''
+        );
+
+    // NORMALIZE PLATFORM
+    if (str_contains($accountType, 'twitter')) {
+        $normalizedPlatform = 'twitter';
+
+    } elseif (str_contains($accountType, 'instagram')) {
+        $normalizedPlatform = 'instagram';
+
+    } elseif (str_contains($accountType, 'facebook')) {
+        $normalizedPlatform = 'facebook';
+
+    } elseif (str_contains($accountType, 'linkedin')) {
+        $normalizedPlatform = 'linkedin';
+
+    } elseif (str_contains($accountType, 'mastodon')) {
+        $normalizedPlatform = 'mastodon';
+
+    } else {
+        $normalizedPlatform = '';
+    }
+
+    // STATUS
+    if (!empty($post['draft'])) {
+        $postStatus = 'draft';
+
+    } elseif (!empty($post['published'])) {
+        $postStatus = 'published';
+
+    } else {
+        $postStatus = 'scheduled';
+    }
+
+    // SEARCH
+    if (
+        $search !== '' &&
+        !str_contains($content, strtolower($search))
+    ) {
+        return false;
+    }
+
+    // PLATFORM
+    if (
+        $platform !== '' &&
+        $normalizedPlatform !== strtolower($platform)
+    ) {
+        return false;
+    }
+
+    // STATUS
+    if (
+        $status !== '' &&
+        $postStatus !== strtolower($status)
+    ) {
+        return false;
+    }
+
+    return true;
+});
+
+
 usort($posts, function($a, $b) {
     $pa = !empty($a['publish_at']) ? strtotime($a['publish_at']) : 0;
     $pb = !empty($b['publish_at']) ? strtotime($b['publish_at']) : 0;
     return $pb <=> $pa; // newest first
 });
-?>
 
+$totalPosts = count($posts);
+$totalPages = max(1, ceil($totalPosts / $POSTS_PER_PAGE));
+
+$page = min($page, $totalPages);
+
+$offset = ($page - 1) * $POSTS_PER_PAGE;
+
+$posts = array_slice(
+    $posts,
+    $offset,
+    $POSTS_PER_PAGE
+);
+?>
+<?php
+$platformOptions = [
+    'instagram' => 'Instagram',
+    'twitter'   => 'Twitter',
+    'facebook'  => 'Facebook',
+    'linkedin'  => 'LinkedIn',
+    'mastodon'  => 'Mastodon'
+];
+
+$statusOptions = [
+    'draft'     => 'Draft',
+    'scheduled' => 'Scheduled',
+    'published' => 'Published'
+];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -302,14 +457,14 @@ input, select, button, span{
     margin: 0;
 }
 
-button.add-account{
+a.add-account{
     background: #04a3ce !important;
     color: white;
     cursor: pointer;
     transition: 0.15s ease-in-out;
 }
 
-button.add-account:hover {
+a.add-account:hover {
     background: #1b78aeff !important;
     transform: scale(1.05);
 }
@@ -380,6 +535,45 @@ button.add-account:hover {
 .post-images.multiple div {
     aspect-ratio: 1 / 1;  /* 🔥 forces square cells */
 }
+.post-images {
+    width: 170px;
+    height: 170px;
+    display: grid;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.post-images div{
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #f3f4f6;
+
+    position: relative; /* IMPORTANT */
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.post-images.single {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+.post-images.single div {
+    width: 100%;
+    height: 100%;
+}
+
+.post-images.multiple {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+}
+
+.post-images.multiple div {
+    aspect-ratio: 1 / 1;  /* 🔥 forces square cells */
+}
 
 .post-images div {
     width: 100%;
@@ -397,6 +591,81 @@ button.add-account:hover {
     background: white;
 
     display: block;
+}
+
+form select{
+    width: 30% !important;
+}
+
+form select {
+    width: 220px !important;
+    min-width: 220px;
+    flex: 0 0 auto;
+    cursor: pointer;
+    contain: layout paint;
+    will-change: auto;
+}
+
+.post-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 300px;
+}
+.btn.btn-primary.filter{
+    transition: 0.15s;
+    color:#9a97a7 !important;
+    background: white !important;
+}
+.btn.btn-primary.filter:hover{
+    transition: 0.15s;
+    color: #f8f8f8 !important;
+    background: #1b78aeff !important;
+}
+.image-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.single .image-spinner {
+    position: absolute;
+    top: 43%;
+    left: 43%;
+    transform: translate(-43%, -43%);
+    font-size: 24px;
+    color: #9a97a7;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.multiple .image-spinner {
+    position: absolute;
+    top: 35%;
+    left: 35%;
+    transform: translate(-35%, -35%);
+    font-size: 24px;
+    color: #9a97a7;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.image-wrapper img.loaded {
+    opacity: 1;
+}
+
+.image-wrapper img {
+    transform: translateZ(0);
+    will-change: opacity;
 }
 </style>
 </head>
@@ -427,29 +696,62 @@ button.add-account:hover {
                     <div style="width: 53%; margin: 0px 20px 15px 10px; color: #44424d;">
                                 <a href="dashboard.php">Posts</a> > <a style="color: #04a3ce !important; font-weight: bold;">Post List</a>
                             </div>
-                    <div class="d-flex gap-2 mb-3">
+                            
+                    <form method="GET" class="d-flex gap-2 mb-3">
+
                         <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search" style="color: #9a97a7;"></i></span>
-                            <input type="text" id="accountSearch" class="form-control border-start-0" placeholder="Search posts...">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="fas fa-search" style="color: #9a97a7;"></i>
+                            </span>
+
+                            <input
+                                type="text"
+                                name="search"
+                                class="form-control border-start-0"
+                                placeholder="Search posts..."
+                                value="<?= htmlspecialchars($search) ?>">
                         </div>
-                        <select id="accountFilter" class="form-select">
-                            <option value="">All Platforms</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="twitter">Twitter</option>
-                            <option value="facebook">Facebook</option>
-                            <option value="linkedin">LinkedIn</option>
-                            <option value="mastodon">Mastodon</option>
+
+                        <select name="platform" class="form-select">
+
+                            <option value="">
+                                All Platforms (<?= array_sum($platformCounts) ?>)
+                            </option>
+
+                            <?php foreach ($platformOptions as $key => $label): ?>
+                                <option
+                                    value="<?= $key ?>"
+                                    <?= $platform === $key ? 'selected' : '' ?>>
+                                    <?= $label ?> (<?= $platformCounts[$key] ?? 0 ?>)
+                                </option>
+                            <?php endforeach; ?>
+
                         </select>
-                        <select id="statusFilter" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="draft">Draft</option>
-                            <option value="scheduled">Scheduled</option>
-                            <option value="published">Published</option>
+
+                        <select name="status" class="form-select">
+
+                            <option value="">
+                                All Statuses (<?= array_sum($statusCounts) ?>)
+                            </option>
+
+                            <?php foreach ($statusOptions as $key => $label): ?>
+                                <option
+                                    value="<?= $key ?>"
+                                    <?= $status === $key ? 'selected' : '' ?>>
+                                    <?= $label ?> (<?= $statusCounts[$key] ?? 0 ?>)
+                                </option>
+                            <?php endforeach; ?>
+
                         </select>
-                        <button class="add-account btn btn-primary w-100" onclick="window.location.href='post-new.php'">
-                            <i class="fas fa-plus"></i><b> New Post</b>
+
+                        <button type="submit" class="btn btn-primary filter">
+                            <i class="fas fa-filter"></i>
                         </button>
-                    </div>
+                        <a href="post-new.php" class="add-account btn btn-primary w-100">
+                            <i class="fas fa-plus"></i><b> New Post</b>
+                        </a>
+
+                    </form>
                     <div class="ui-container">
                         <h2 style="color: #312b2f !important;">Your Posts</h2>
                         <div class="accounts mt-4">
@@ -464,7 +766,27 @@ button.add-account:hover {
                                 $publishAt = utcToMalaysia($post['publish_at'] ?? '');
                                 $createdAt = utcToMalaysia($post['created_at'] ?? '');
                                 $accountId = htmlspecialchars($post['account_id'] ?? '');
-                                $accountType = htmlspecialchars($post['account_type'] ?? '');
+                                $accountType = strtolower(
+                                    $post['account_type']
+                                    ?? $post['type']
+                                    ?? ''
+                                );
+
+                                if (str_contains($accountType, 'twitter')) {
+                                    $accountType = 'twitter';
+
+                                } elseif (str_contains($accountType, 'instagram')) {
+                                    $accountType = 'instagram';
+
+                                } elseif (str_contains($accountType, 'facebook')) {
+                                    $accountType = 'facebook';
+
+                                } elseif (str_contains($accountType, 'linkedin')) {
+                                    $accountType = 'linkedin';
+
+                                } elseif (str_contains($accountType, 'mastodon')) {
+                                    $accountType = 'mastodon';
+                                }
                                 $accountPfp  = $accountImageMap[$accountId] ?? 'assets/default-avatar.png';
                                 $accountName = $accountNameMap[$accountId] ?? 'Unknown Account';
 
@@ -569,9 +891,28 @@ button.add-account:hover {
 
                                 <div class="post-images <?= $gridClass ?>">
                                     <?php if ($imageCount > 0): ?>
-                                        <?php foreach (array_slice($validImages, 0, 4) as $url): ?>
-                                            <div href="<?= htmlspecialchars($url) ?>" target="_blank">
-                                                <img src="<?= htmlspecialchars($url) ?>" loading="<?= $index < 2 ? 'eager' : 'lazy' ?>" decoding="async" draggable="false">
+                                        <?php foreach (array_slice($validImages, 0, 4) as $index => $url): ?>
+                                            <div class="image-wrapper">
+
+                                                <img
+                                                    src="<?= htmlspecialchars($url) ?>"
+                                                    width="170"
+                                                    height="170"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    fetchpriority="low"
+                                                    draggable="false"
+
+                                                    onload="
+                                                        this.classList.add('loaded');
+                                                        this.previousElementSibling.style.display='none';
+                                                    "
+
+                                                    onerror="
+                                                        this.previousElementSibling.style.display='none';
+                                                    "
+                                                >
+
                                             </div>
                                         <?php endforeach; ?>
                                     <?php else: ?>
@@ -595,7 +936,42 @@ button.add-account:hover {
 
                         </div>
 
+                        <div class="d-flex justify-content-center gap-2 mt-4 flex-wrap">
 
+                            <?php if ($page > 1): ?>
+
+                                <a class="btn btn-light border"href="?search=<?= urlencode($search) ?>&platform=<?= urlencode($platform) ?>&status=<?= urlencode($status) ?>&page=<?= $page - 1 ?>"> Previous </a>
+
+                            <?php endif; ?>
+
+                            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+
+                                <a
+                                    class="btn <?= $i == $page ? 'btn-primary' : 'btn-light border' ?>"
+                                    href="?search=<?= urlencode($search) ?>
+                                    &platform=<?= urlencode($platform) ?>
+                                    &status=<?= urlencode($status) ?>
+                                    &page=<?= $i ?>">
+
+                                    <?= $i ?>
+
+                                </a>
+
+                            <?php endfor; ?>
+
+                            <?php if ($page < $totalPages): ?>
+
+                                <a class="btn btn-light border"
+                                href="?search=<?= urlencode($search) ?>
+                                &platform=<?= urlencode($platform) ?>
+                                &status=<?= urlencode($status) ?>
+                                &page=<?= $page + 1 ?>">
+                                Next
+                                </a>
+
+                            <?php endif; ?>
+
+                            </div>
 
                         </div>
                     </div>
@@ -605,131 +981,6 @@ button.add-account:hover {
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-
-        const searchInput = document.getElementById('accountSearch');
-        const filterSelect = document.getElementById('accountFilter');
-        const statusFilter = document.getElementById('statusFilter');
-        const noResults = document.getElementById('noResultsMessage');
-
-        const postCards = [...document.querySelectorAll('.accounts-grid .post-card')];
-
-        function normalizePlatform(platform) {
-
-            if (platform.includes('twitter')) return 'twitter';
-            if (platform.includes('mastodon')) return 'mastodon';
-            if (platform.includes('facebook')) return 'facebook';
-            if (platform.includes('instagram')) return 'instagram';
-            if (platform.includes('linkedin')) return 'linkedin';
-
-            return platform;
-        }
-
-        function getPlatformIcon(platform) {
-
-            switch (platform) {
-
-                case 'twitter':
-                    return '<i class="fab fa-twitter"></i>';
-
-                case 'facebook':
-                    return '<i class="fab fa-facebook"></i>';
-
-                case 'instagram':
-                    return '<i class="fab fa-instagram"></i>';
-
-                case 'linkedin':
-                    return '<i class="fab fa-linkedin"></i>';
-
-                case 'mastodon':
-                    return '<i class="fab fa-mastodon"></i>';
-
-                default:
-                    return '<i class="fas fa-share"></i>';
-            }
-        }
-
-        // PREPROCESS EVERYTHING ONCE
-        postCards.forEach(card => {
-
-            const strong = card.querySelector('strong');
-            const platformElement = card.querySelector('.platform-tag');
-
-            const content =
-                strong?.textContent.toLowerCase() || '';
-
-            let platform =
-                platformElement?.textContent.toLowerCase().trim() || '';
-
-            platform = normalizePlatform(platform);
-
-            card.dataset.content = content;
-            card.dataset.platform = platform;
-            card.dataset.status = (card.dataset.status || '').toLowerCase();
-
-            // Inject icon once only
-            if (platformElement) {
-
-                platformElement.innerHTML =
-                    getPlatformIcon(platform) + ' ' + platformElement.textContent;
-
-            }
-
-        });
-
-        function filterPosts() {
-
-            const searchTerm =
-                searchInput.value.toLowerCase().trim();
-
-            const selectedPlatform =
-                filterSelect.value.toLowerCase();
-
-            const selectedStatus =
-                statusFilter.value.toLowerCase();
-
-            let anyVisible = false;
-
-            for (const card of postCards) {
-
-                const matchesSearch =
-                    card.dataset.content.includes(searchTerm);
-
-                const matchesPlatform =
-                    !selectedPlatform ||
-                    card.dataset.platform === selectedPlatform;
-
-                const matchesStatus =
-                    !selectedStatus ||
-                    card.dataset.status === selectedStatus;
-
-                const visible =
-                    matchesSearch &&
-                    matchesPlatform &&
-                    matchesStatus;
-
-                card.classList.toggle('hidden', !visible);
-
-                if (visible) {
-                    anyVisible = true;
-                }
-            }
-
-            noResults.style.display =
-                anyVisible ? 'none' : 'block';
-        }
-
-        // FILTER EVENTS
-        searchInput.addEventListener('input', filterPosts);
-        filterSelect.addEventListener('change', filterPosts);
-        statusFilter.addEventListener('change', filterPosts);
-
-        // INITIAL RUN
-        filterPosts();
-
-    });
-</script>
 </body>
 
 </html>

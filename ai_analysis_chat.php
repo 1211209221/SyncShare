@@ -590,7 +590,7 @@ $payload = [
 $ch = curl_init();
 
 curl_setopt($ch, CURLOPT_URL,
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=" . $API_KEY
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" . $API_KEY
 );
 
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

@@ -114,6 +114,20 @@ if (empty($_SESSION['token'])) die("❌ No API token found in session.");
 $token = $_SESSION['token'];
 $responseMessage = "";
 
+
+
+$content =
+    $_GET['content'] ?? '';
+
+$source =
+    $_GET['source'] ?? '';
+
+$images =
+    json_decode(
+        $_GET['images'] ?? '[]',
+        true
+    );
+
 // ===========================
 // 🔹 Function: Upload Media
 // ===========================
@@ -265,7 +279,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
                 $result = uploadMediaToSocialBu($tmpPath, $token);
 
                 if (!empty($result['success'])) {
+
                     $upload_tokens[] = $result['upload_token'];
+
+                } else {
+
+                    echo "<script>";
+                    echo "console.error('Upload failed:', " . json_encode($result) . ");";
+                    echo "</script>";
+
+                    $responseMessage .= '
+                    <div class="alert alert-danger mt-2">
+                        ❌ Media upload failed
+                        <pre style="white-space:pre-wrap;">'
+                        . htmlspecialchars(json_encode($result, JSON_PRETTY_PRINT)) .
+                        '</pre>
+                    </div>';
                 }
             }
         }
@@ -307,7 +336,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
                 }
 
                 if (!empty($result['success'])) {
+
                     $upload_tokens[] = $result['upload_token'];
+
+                } else {
+
+                    echo "<script>";
+                    echo "console.error('Upload failed:', " . json_encode($result) . ");";
+                    echo "</script>";
+
+                    $responseMessage .= '
+                    <div class="alert alert-danger mt-2">
+                        ❌ Media upload failed
+                        <pre style="white-space:pre-wrap;">'
+                        . htmlspecialchars(json_encode($result, JSON_PRETTY_PRINT)) .
+                        '</pre>
+                    </div>';
                 }
             }
         }
@@ -389,6 +433,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
                 $upload_tokens
             );
 
+            /*
+            |--------------------------------------------------------------------------
+            | DEBUG ATTACHMENTS
+            |--------------------------------------------------------------------------
+            */
+
+            echo "<script>";
+            echo "console.group('Attachment Debug');";
+            echo "console.log('Upload Tokens:', " . json_encode($upload_tokens) . ");";
+            echo "console.log('Attachments:', " . json_encode($attachments) . ");";
+            echo "console.groupEnd();";
+            echo "</script>";
             $success = true;
 
 
@@ -458,13 +514,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
     ]);
 
     $response = curl_exec($ch);
+
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
     $curl_error = curl_error($ch);
 
     curl_close($ch);
 
+    /*
+    |--------------------------------------------------------------------------
+    | DEBUG RESPONSE
+    |--------------------------------------------------------------------------
+    */
+
+    echo "<script>";
+    echo "console.group('SocialBu Post Debug');";
+    echo "console.log('Account ID:', " . json_encode($accountId) . ");";
+    echo "console.log('HTTP Code:', " . json_encode($httpcode) . ");";
+    echo "console.log('Payload:', " . json_encode($payload) . ");";
+    echo "console.log('Raw Response:', " . json_encode($response) . ");";
+    echo "console.log('cURL Error:', " . json_encode($curl_error) . ");";
+    echo "console.groupEnd();";
+    echo "</script>";
+
+    /*
+    |--------------------------------------------------------------------------
+    | HANDLE FAILURE
+    |--------------------------------------------------------------------------
+    */
+
     if ($httpcode < 200 || $httpcode >= 300) {
+
         $success = false;
+
+        $decodedError = json_decode($response, true);
+
+        $errorMessage =
+            $decodedError['message']
+            ?? $decodedError['error']
+            ?? $response
+            ?? 'Unknown API error';
+
+        $responseMessage .= '
+        <div class="alert alert-danger mt-3">
+            <b>❌ Failed posting to account ID ' . htmlspecialchars($accountId) . '</b>
+            <hr>
+            <b>HTTP:</b> ' . htmlspecialchars($httpcode) . '<br>
+            <b>Error:</b><br>
+            <pre style="white-space:pre-wrap;">' . htmlspecialchars($errorMessage) . '</pre>
+        </div>';
     }
 }
 
@@ -512,6 +610,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST["ajax_generate_image"
     }
 }
 
+?>
+<?php
+$passedImages = [];
+
+if (!empty($_GET['images'])) {
+    $decodedImages = json_decode($_GET['images'], true);
+
+    if (is_array($decodedImages)) {
+        foreach ($decodedImages as $img) {
+            if (is_array($img) && !empty($img['url'])) {
+                $passedImages[] = $img['url'];
+            } elseif (is_string($img) && filter_var($img, FILTER_VALIDATE_URL)) {
+                $passedImages[] = $img;
+            }
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -953,33 +1068,29 @@ label{
                                             </div>
                                         </div>
                                          
-<div class="mb-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Post Content</label>
+                                            <!-- tabs -->
+                                            <div style="position:relative;">
+                                                <div id="platformTabs" class="mb-2 d-flex"></div>
+                                                <div id="charCounter" class="small text-muted " style="position:absolute; right: 5px; bottom: 5px; margin-bottom: -10px;">
+                                                    0 characters
+                                                </div>
+                                            </div>
 
-    <label class="form-label">Post Content</label>
+                                            <!-- one textarea only -->
+                                            <textarea style="height:160px;" class="form-control" id="postContent" rows="4" placeholder="Write your post here..." required></textarea>
 
-    <!-- tabs -->
-    <div id="platformTabs" class="mb-2"></div>
+                                            <!-- hidden JSON -->
+                                            <input
+                                                type="hidden"
+                                                id="platform_content"
+                                                name="platform_content"
+                                            >
 
-    <!-- one textarea only -->
-    <textarea
-        style="height:160px;"
-        class="form-control"
-        id="postContent"
-        rows="4"
-        placeholder="Write your post here..."
-        required
-    ></textarea>
-
-    <!-- hidden JSON -->
-    <input
-        type="hidden"
-        id="platform_content"
-        name="platform_content"
-    >
-
-</div>
+                                        </div>
                                         
-                                        <input type="hidden" id="library_images" name="library_images">
+                                        <input type="hidden" id="library_images" name="library_images" value='<?= htmlspecialchars(json_encode($passedImages), ENT_QUOTES) ?>'>
 
                                         <div class="mb-3">
                                         <label class="form-label">Attach Images</label>
@@ -1077,7 +1188,7 @@ label{
 </div>
 </body>
 <script>
-    const accountCheckboxes =
+const accountCheckboxes =
     document.querySelectorAll('.account-checkbox');
 
 const tabsContainer =
@@ -1091,13 +1202,31 @@ const hiddenInput =
 
 let activeAccount = 'main';
 
+/*
+|--------------------------------------------------------------------------
+| STORE CONTENT
+|--------------------------------------------------------------------------
+*/
 let platformContent = {
-    main: ''
+    main: <?= json_encode(html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?>
 };
 
-accountCheckboxes.forEach(cb=>{
+/*
+|--------------------------------------------------------------------------
+| INIT
+|--------------------------------------------------------------------------
+*/
+textarea.value = platformContent.main;
+syncHiddenInput();
 
-    cb.addEventListener('change', function(){
+/*
+|--------------------------------------------------------------------------
+| ACCOUNT SELECT
+|--------------------------------------------------------------------------
+*/
+accountCheckboxes.forEach(cb => {
+
+    cb.addEventListener('change', function () {
 
         const parent =
             this.closest('.account-item');
@@ -1107,220 +1236,179 @@ accountCheckboxes.forEach(cb=>{
             this.checked
         );
 
-        updateTabs();
-    });
+        const accountId = this.value;
 
-});
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE EMPTY SLOT
+        |--------------------------------------------------------------------------
+        */
+        if (
+            this.checked &&
+            platformContent[accountId] === undefined
+        ) {
+            platformContent[accountId] = '';
+        }
 
-
-textarea.addEventListener('input', ()=>{
-
-    if(activeAccount !== null){
-
-        platformContent[activeAccount] =
-            textarea.value;
-
-        syncHiddenInput();
-    }
-});
-
-
-function updateTabs(){
-
-    const selected =
-        document.querySelectorAll(
-            '.account-checkbox:checked'
-        );
-
-
-    tabsContainer.innerHTML = '';
-
-
-    /* MAIN TAB ALWAYS EXISTS */
-    createMainTab();
-
-
-    /* if 0 or 1 account,
-       hide account tabs */
-    if(selected.length <= 1){
-
-        tabsContainer.style.display =
-            'none';
-
-        if(
-            activeAccount !== 'main' &&
-            !selectedNamed(activeAccount)
-        ){
+        /*
+        |--------------------------------------------------------------------------
+        | IF CURRENT TAB REMOVED
+        |--------------------------------------------------------------------------
+        */
+        if (
+            !this.checked &&
+            activeAccount == accountId
+        ) {
             activeAccount = 'main';
         }
 
-        textarea.value =
-            platformContent[
-                activeAccount
-            ] || '';
-
-        syncHiddenInput();
-
-        return;
-    }
-
-
-    tabsContainer.style.display =
-        'flex';
-
-
-    selected.forEach(cb=>{
-
-        const accountId =
-            cb.value;
-
-        const accountCard =
-            cb.closest(
-                '.account-item'
-            );
-
-        const profileImage =
-            accountCard
-            .querySelector('img')
-            .src;
-
-
-        if(
-            platformContent[
-                accountId
-            ] === undefined
-        ){
-            platformContent[
-                accountId
-            ] = '';
-        }
-
-
-        const tab =
-            document.createElement(
-                'div'
-            );
-
-        tab.className =
-            'platform-tab';
-
-
-        if(
-            activeAccount ===
-            accountId
-        ){
-            tab.classList.add(
-                'active'
-            );
-        }
-
-
-        tab.innerHTML = `
-            <img
-                src="${profileImage}"
-            >
-        `;
-
-
-        tab.addEventListener(
-            'click',
-            ()=>switchTab(
-                accountId
-            )
-        );
-
-
-        tabsContainer.appendChild(
-            tab
-        );
+        renderTabs();
     });
 
+});
 
+/*
+|--------------------------------------------------------------------------
+| TEXTAREA SAVE
+|--------------------------------------------------------------------------
+*/
+textarea.addEventListener('input', () => {
+
+    platformContent[activeAccount] =
+        textarea.value;
+
+    syncHiddenInput();
+
+});
+
+/*
+|--------------------------------------------------------------------------
+| SWITCH TAB
+|--------------------------------------------------------------------------
+*/
+function switchTab(accountId) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAVE CURRENT TAB
+    |--------------------------------------------------------------------------
+    */
+    platformContent[activeAccount] =
+        textarea.value;
+
+    /*
+    |--------------------------------------------------------------------------
+    | SWITCH
+    |--------------------------------------------------------------------------
+    */
+    activeAccount = accountId;
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD NEW CONTENT
+    |--------------------------------------------------------------------------
+    */
     textarea.value =
-        platformContent[
-            activeAccount
-        ] || '';
+        platformContent[accountId] || '';
 
+    renderTabs();
 
     syncHiddenInput();
 }
 
-function createMainTab(){
+/*
+|--------------------------------------------------------------------------
+| RENDER TABS
+|--------------------------------------------------------------------------
+*/
+function renderTabs() {
 
-    const tab =
-        document.createElement(
-            'div'
-        );
+    tabsContainer.innerHTML = '';
 
-    tab.className =
+    /*
+    |--------------------------------------------------------------------------
+    | MAIN TAB
+    |--------------------------------------------------------------------------
+    */
+    const mainTab =
+        document.createElement('div');
+
+    mainTab.className =
         'platform-tab main-tab';
 
-
-    if(
-        activeAccount ===
-        'main'
-    ){
-        tab.classList.add(
-            'active'
-        );
+    if (activeAccount === 'main') {
+        mainTab.classList.add('active');
     }
 
-
-    tab.innerHTML = `
-        <i
-            class="fas fa-pen"
-            style="
-                font-size:16px;
-                color:inherit;
-            "
-        ></i>
+    mainTab.innerHTML = `
+        <i class="fas fa-pen"></i>
     `;
 
-    tab.addEventListener(
-        'click',
-        ()=>switchTab(
-            'main'
+    mainTab.onclick = () =>
+        switchTab('main');
+
+    tabsContainer.appendChild(mainTab);
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACCOUNT TABS
+    |--------------------------------------------------------------------------
+    */
+    document
+        .querySelectorAll(
+            '.account-checkbox:checked'
         )
-    );
+        .forEach(cb => {
 
+            const accountId =
+                cb.value;
 
-    tabsContainer.appendChild(
-        tab
-    );
+            const img =
+                cb.closest('.account-item')
+                  .querySelector('img')
+                  .src;
+
+            const tab =
+                document.createElement('div');
+
+            tab.className =
+                'platform-tab';
+
+            if (activeAccount == accountId) {
+                tab.classList.add('active');
+            }
+
+            tab.innerHTML = `
+                <img src="${img}">
+            `;
+
+            tab.onclick = () =>
+                switchTab(accountId);
+
+            tabsContainer.appendChild(tab);
+        });
+
+    syncHiddenInput();
 }
 
-function switchTab(accountId){
-
-    platformContent[
-        activeAccount
-    ] = textarea.value;
-
-
-    activeAccount =
-        accountId;
-
-
-    updateTabs();
-}
-
-
-function selectedNamed(accountId){
-
-    return document.querySelector(
-        `.account-checkbox[value="${accountId}"]:checked`
-    );
-}
-
-
-function syncHiddenInput(){
+/*
+|--------------------------------------------------------------------------
+| HIDDEN JSON
+|--------------------------------------------------------------------------
+*/
+function syncHiddenInput() {
 
     hiddenInput.value =
-        JSON.stringify(
-            platformContent
-        );
+        JSON.stringify(platformContent);
+
 }
 
-updateTabs();
+/*
+|--------------------------------------------------------------------------
+| INITIAL RENDER
+|--------------------------------------------------------------------------
+*/
+renderTabs();
 </script>
 <script>
 
@@ -1460,6 +1548,252 @@ document.getElementById('applyAI').addEventListener('click', async () => {
         }
     });*/
     });
+</script>
+<script>
+/*
+|--------------------------------------------------------------------------
+| PLATFORM CHARACTER LIMITS
+|--------------------------------------------------------------------------
+*/
+const PLATFORM_LIMITS = {
+    twitter: 280,
+    x: 280,
+    mastodon: 500,
+    linkedin: 3000,
+    facebook: 63206,
+    instagram: 2200,
+    threads: 500,
+    youtube: 5000,
+    tiktok: 2200,
+    pinterest: 500
+};
+
+const charCounter =
+    document.getElementById('charCounter');
+
+/*
+|--------------------------------------------------------------------------
+| GET PLATFORM NAME FROM ACCOUNT
+|--------------------------------------------------------------------------
+*/
+function getPlatformType(accountId) {
+
+    const checkbox =
+        document.querySelector(
+            `.account-checkbox[value="${accountId}"]`
+        );
+
+    if (!checkbox) return null;
+
+    const accountItem =
+        checkbox.closest('.account-item');
+
+    const text =
+        accountItem.innerText.toLowerCase();
+
+    if (text.includes('twitter')) return 'twitter';
+    if (text.includes('x')) return 'x';
+    if (text.includes('mastodon')) return 'mastodon';
+    if (text.includes('linkedin')) return 'linkedin';
+    if (text.includes('facebook')) return 'facebook';
+    if (text.includes('instagram')) return 'instagram';
+    if (text.includes('threads')) return 'threads';
+    if (text.includes('youtube')) return 'youtube';
+    if (text.includes('tiktok')) return 'tiktok';
+    if (text.includes('pinterest')) return 'pinterest';
+
+    return null;
+}
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE CHARACTER COUNTER
+|--------------------------------------------------------------------------
+*/
+function updateCharacterCounter() {
+
+    const text =
+        textarea.value || '';
+
+    const length =
+        text.length;
+
+    let limitText = '';
+    let exceeded = false;
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAIN TAB
+    |--------------------------------------------------------------------------
+    */
+    if (activeAccount === 'main') {
+
+        const checkedAccounts =
+            document.querySelectorAll(
+                '.account-checkbox:checked'
+            );
+
+        let violatedPlatforms = [];
+        let uniquePlatforms = new Set();
+
+        checkedAccounts.forEach(cb => {
+
+            const platform =
+                getPlatformType(cb.value);
+
+            if (
+                platform &&
+                PLATFORM_LIMITS[platform]
+            ) {
+
+                uniquePlatforms.add(platform);
+
+                const limit =
+                    PLATFORM_LIMITS[platform];
+
+                if (length > limit) {
+                    violatedPlatforms.push(
+                        `${platform} (${limit})`
+                    );
+                }
+            }
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | REMOVE DUPLICATES FROM VIOLATIONS
+        |--------------------------------------------------------------------------
+        */
+        violatedPlatforms = [...new Set(violatedPlatforms)];
+
+        if (violatedPlatforms.length > 0) {
+
+            exceeded = true;
+
+            limitText =
+                `Exceeds: ${violatedPlatforms.join(', ')}`;
+
+        } else {
+
+            const limits = [];
+
+            uniquePlatforms.forEach(platform => {
+
+                limits.push(
+                    `${platform}: ${PLATFORM_LIMITS[platform]}`
+                );
+
+            });
+
+            limitText =
+                limits.length
+                    ? limits.join(' | ')
+                    : 'No platform selected';
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | INDIVIDUAL TAB
+    |--------------------------------------------------------------------------
+    */
+    else {
+
+        const platform =
+            getPlatformType(activeAccount);
+
+        if (
+            platform &&
+            PLATFORM_LIMITS[platform]
+        ) {
+
+            const limit =
+                PLATFORM_LIMITS[platform];
+
+            limitText =
+                `${platform}: ${length}/${limit}`;
+
+            if (length > limit) {
+                exceeded = true;
+            }
+
+        } else {
+
+            limitText =
+                `${length} characters`;
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RENDER
+    |--------------------------------------------------------------------------
+    */
+    charCounter.innerHTML =
+        `<strong>${length}</strong> characters | ${limitText}`;
+
+    charCounter.classList.remove(
+        'text-muted',
+        'text-danger'
+    );
+
+    charCounter.classList.add(
+        exceeded
+            ? 'text-danger'
+            : 'text-muted'
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE ON INPUT
+|--------------------------------------------------------------------------
+*/
+textarea.addEventListener('input', () => {
+
+    platformContent[activeAccount] =
+        textarea.value;
+
+    syncHiddenInput();
+
+    updateCharacterCounter();
+
+});
+
+/*
+|--------------------------------------------------------------------------
+| PATCH TAB SWITCH
+|--------------------------------------------------------------------------
+*/
+const originalSwitchTab = switchTab;
+
+switchTab = function(accountId) {
+
+    originalSwitchTab(accountId);
+
+    updateCharacterCounter();
+};
+
+/*
+|--------------------------------------------------------------------------
+| PATCH TAB RENDER
+|--------------------------------------------------------------------------
+*/
+const originalRenderTabs = renderTabs;
+
+renderTabs = function() {
+
+    originalRenderTabs();
+
+    updateCharacterCounter();
+};
+
+/*
+|--------------------------------------------------------------------------
+| INITIAL
+|--------------------------------------------------------------------------
+*/
+updateCharacterCounter();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -1650,7 +1984,9 @@ document.querySelector("form").addEventListener("submit", function(e) {
 
 });
 </script>
-
+<script>
+window.__PREFILLED_IMAGES__ = <?= json_encode($passedImages) ?>;
+</script>
 
 <script>
 document.getElementById("generateAIImage").addEventListener("click", async function () {
@@ -1774,8 +2110,140 @@ document.getElementById("generateAIImage").addEventListener("click", async funct
         messageBox.innerHTML = `<span class='text-danger'>❌ Error: ${err.message}</span>`;
     }
 });
+
+window.addEventListener('DOMContentLoaded', () => {
+    if (Array.isArray(window.__PREFILLED_IMAGES__) && window.__PREFILLED_IMAGES__.length) {
+        selected = window.__PREFILLED_IMAGES__.slice(0, 4);
+        updateLibraryInput();
+        renderPreview();
+    }
+});
 </script>
 <!-- Debug container somewhere below the AI input -->
 <!-- <pre id="aiPromptDebug" style="background:#eef;padding:10px;border-radius:8px;margin-top:10px;"></pre> -->
+     <?php
+$debugImages = [];
+
+if (!empty($_POST['library_images'])) {
+
+    $decodedImages = json_decode($_POST['library_images'], true);
+
+    if (is_array($decodedImages)) {
+        $debugImages = $decodedImages;
+    }
+
+} elseif (!empty($_GET['images'])) {
+
+    $decodedImages = json_decode($_GET['images'], true);
+
+    if (is_array($decodedImages)) {
+        $debugImages = $decodedImages;
+    }
+}
+?>
+
+<?php
+// -------------------------------------------------
+// Normalize debug images into plain URL list
+// -------------------------------------------------
+
+$rawImages = $debugImages ?? [];
+$normalizedImages = [];
+
+if (is_string($rawImages)) {
+    $rawImages = json_decode($rawImages, true);
+}
+
+if (is_array($rawImages)) {
+    foreach ($rawImages as $img) {
+
+        // Case 1: SocialBu-style object
+        if (is_array($img) && !empty($img['url'])) {
+            $normalizedImages[] = $img['url'];
+        }
+
+        // Case 2: already a URL string
+        elseif (is_string($img)) {
+            $normalizedImages[] = $img;
+        }
+    }
+}
+
+$normalizedImages = array_values(array_filter($normalizedImages));
+?>
+<!-- 
+<?php if (!empty($normalizedImages)): ?>
+<div style="
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    background: #ffffff;
+    padding: 16px;
+    border-bottom: 2px solid #e6e6e6;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+">
+
+    <h4 style="
+        margin: 0 0 12px 0;
+        color: #312b2f;
+        font-size: 16px;
+        font-weight: 700;
+    ">
+        🧪 Passed Images Verification (<?= count($normalizedImages) ?>)
+    </h4>
+
+    <div style="
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+    ">
+
+        <?php foreach ($normalizedImages as $img): ?>
+
+            <div style="
+                text-align: center;
+                width: 140px;
+            ">
+
+                <div style="
+                    width: 140px;
+                    height: 140px;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    border: 3px solid #04a3ce;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+                    background: #f3f4f6;
+                ">
+
+                    <img
+                        src="<?= htmlspecialchars($img) ?>"
+                        loading="lazy"
+                        style="
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                            display: block;
+                        "
+                        onerror="this.style.display='none';"
+                    >
+
+                </div>
+
+                <div style="
+                    margin-top: 6px;
+                    font-size: 11px;
+                    color: #777;
+                    word-break: break-all;
+                ">
+                    <?= htmlspecialchars(basename(parse_url($img, PHP_URL_PATH) ?? $img)) ?>
+                </div>
+
+            </div>
+
+        <?php endforeach; ?>
+
+    </div>
+</div>
+<?php endif; ?> -->
 </body>
 </html>
