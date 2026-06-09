@@ -996,6 +996,17 @@ label{
     transform:scale(1.08);
 }
 
+a.ai-content-studio{
+    background: linear-gradient(135deg, #04a3ce 0%, #5b5bd6 55%, #7a60c3 100%) !important;
+    transition: 0.15s;
+}
+
+a.ai-content-studio:hover{
+    background: linear-gradient(135deg, #0675a4 0%, #5a34ad 55%, #6f3e92 100%) !important;
+    transform: scale(1.05);
+    transition: 0.15s;
+}
+
 </style>
 </head>
 <body>
@@ -1127,7 +1138,12 @@ label{
                                     </div>
                                 </div>
                                 <div class="ui-container second" style="width: 35% !important;">
-                                    <h2 style="color: #312b2f; font-size: 24px;">AI Assistant <i class="fas fa-cog" style="padding-left: 5px;"></i></h2>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <h2 style="color: #312b2f; font-size: 24px;">AI Assistant <i class="fas fa-cog" style="padding-left: 5px;"></i></h2>
+                                        <a href="ai-content-studio.php" class="add-account btn btn-primary w-100 create-post ai-content-studio" style="width: 155px !important;">
+                                            <b>AI Content Studio</b>
+                                        </a>
+                                    </div>
                                     <hr style="margin: 10px 0px 16px 0px;">
                                     <div class="mb-3">
                                         <label class="form-label">AI-Rewrite</label>

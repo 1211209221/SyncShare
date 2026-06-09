@@ -1322,9 +1322,9 @@ textarea:focus {
                                                     <label for="metricsRange" class="form-label">Select Range:</label>
                                                     <select id="metricsRange" class="form-select" style="width:200px; display:inline-block;">
                                                         <!-- <option value="24h">First 24 Hours</option> -->
-                                                        <option value="week">First Week</option>
-                                                        <option value="month">First Month</option>
                                                         <option value="all" selected>Overall</option>
+                                                        <option value="month">First Month</option>
+                                                        <option value="week">First Week</option>
                                                     </select>
                                                 </div>
 
@@ -1410,21 +1410,34 @@ textarea:focus {
 
     // Filter data by range
     function filterByRange(dataArray, range) {
-        const now = new Date();
 
-        return dataArray.filter(item => {
+        if (!dataArray.length) return [];
+
+        const sorted = [...dataArray].sort(
+            (a, b) => new Date(a.date) - new Date(b.date)
+        );
+
+        const firstDate = new Date(sorted[0].date);
+
+        let limitDays;
+
+        switch (range) {
+            case 'week':
+                limitDays = 7;
+                break;
+            case 'month':
+                limitDays = 30;
+                break;
+            default:
+                return sorted;
+        }
+
+        return sorted.filter(item => {
             const itemDate = new Date(item.date);
+            const diffDays =
+                (itemDate - firstDate) / (1000 * 60 * 60 * 24);
 
-            switch (range) {
-                case '24h':
-                    return now - itemDate <= 24 * 60 * 60 * 1000;
-                case 'week':
-                    return now - itemDate <= 7 * 24 * 60 * 60 * 1000;
-                case 'month':
-                    return now - itemDate <= 30 * 24 * 60 * 60 * 1000;
-                default:
-                    return true;
-            }
+            return diffDays <= limitDays;
         });
     }
 
