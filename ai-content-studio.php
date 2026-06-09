@@ -87,11 +87,7 @@ $topPosts = socialbu_get(
 
 /* limit to 5 posts */
 if (!empty($topPosts['data']['data'])) {
-    $topPosts['data']['data'] = array_slice(
-        $topPosts['data']['data'],
-        0,
-        5
-    );
+    $topPosts['data']['data'] = array_slice($topPosts['data']['data'], 0, 5);
 }
 function quickFetch($url) {
     $ch = curl_init($url);
