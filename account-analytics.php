@@ -173,11 +173,18 @@ $engagementTrend = socialbu_get('insights/accounts/engagement/trend', [
 // =====================================================
 // TOP POSTS
 // =====================================================
-$topPosts = socialbu_get("insights/posts/top_posts?$accountsQueryString&start=$startDate&end=$endDate&metrics=likes");
+$topPosts = socialbu_get(
+    "insights/posts/top_posts",
+    [
+        'start' => '2000-01-01',
+        'end' => $endDate,
+        'metrics' => 'likes'
+    ]
+);
 
 /* limit to 9 posts */
 if (!empty($topPosts['data']['data'])) {
-    $topPosts['data']['data'] = array_slice($topPosts['data']['data'], 0, 5);
+    $topPosts['data']['data'] = array_slice($topPosts['data']['data'], 0, 10);
 }
 
 // ===============================
@@ -217,11 +224,13 @@ foreach ($postsData as $row) {
 // ===============================
 // ENGAGEMENT RATE (7 DAYS)
 // ===============================
-$totalEngagementRate7 = 0;
+$totalFollowers =
+    $followers['data']['data']['total_followers'] ?? 0;
 
-if (!empty($engagementRate['data']['data']['total_engagement_rate'])) {
-    $totalEngagementRate7 = $engagementRate['data']['data']['total_engagement_rate'] * 100;
-}
+$totalEngagementRate7 =
+    $totalFollowers > 0
+        ? ($totalEngagement7 / $totalFollowers) * 100
+        : 0;
 ?>
 <?php
 

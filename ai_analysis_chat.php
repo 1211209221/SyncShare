@@ -147,6 +147,16 @@ Rules:
   - <ul><li>
   - <b>
 
+Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
+
 Analyze the overall health of this account using ONLY these metrics.
 
 METRICS:
@@ -192,6 +202,15 @@ Rules:
   - <ul><li>
   - <b>
 
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
 Analyze ONLY these growth metrics.
 
 METRICS:
@@ -235,6 +254,15 @@ Rules:
   - <ul><li>
   - <b>
 
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
 Using ONLY these metrics, provide actionable recommendations.
 
 METRICS:
@@ -274,6 +302,15 @@ Rules:
   - <ul><li>
   - <b>
 
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
 Analyze ONLY these top performing posts.
 
 TOP POSTS:
@@ -312,6 +349,15 @@ Rules:
   - <p>
   - <ul><li>
   - <b>
+
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
 
 Analyze the audience distribution and platform concentration.
 
@@ -353,6 +399,15 @@ Rules:
   - <ul><li>
   - <b>
 
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
 Analyze the engagement changes using ONLY these metrics.
 
 METRICS:
@@ -393,6 +448,15 @@ Rules:
   - <ul><li>
   - <b>
 
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
 Analyze audience concentration across accounts and platforms.
 
 METRICS:
@@ -430,6 +494,15 @@ Rules:
   - <p>
   - <ul><li>
   - <b>
+
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
 
 Using these metrics and top posts, suggest what content should be created next.
 
@@ -475,6 +548,15 @@ Rules:
   - <ul><li>
   - <b>
 
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
+
 Assess whether this account is gaining, maintaining, or losing momentum.
 
 METRICS:
@@ -513,6 +595,15 @@ Rules:
   - <p>
   - <ul><li>
   - <b>
+
+  Do not reference JSON field names, variable names, or API keys directly.
+
+Translate all metrics into natural language.
+
+For example:
+- 'posts_change_pct' should become 'posting frequency increased/decreased by X%'
+- 'engagement_last_7_days' should become 'the account received X engagements during the last 7 days'
+- 'engagement_history' should become 'historical engagement trends'
 
 Create a strategic assessment using ONLY these metrics.
 

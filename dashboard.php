@@ -277,11 +277,13 @@ foreach ($postsData as $row) {
 // ===============================
 // ENGAGEMENT RATE (7 DAYS)
 // ===============================
-$totalEngagementRate7 = 0;
+$totalFollowers =
+    $followers['data']['data']['total_followers'] ?? 0;
 
-if (!empty($engagementRate['data']['data']['total_engagement_rate'])) {
-    $totalEngagementRate7 = $engagementRate['data']['data']['total_engagement_rate'] * 100;
-}
+$totalEngagementRate7 =
+    $totalFollowers > 0
+        ? ($totalEngagement7 / $totalFollowers) * 100
+        : 0;
 ?>
 <?php
 

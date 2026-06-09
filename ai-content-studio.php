@@ -2742,22 +2742,7 @@ a.btn.btn-primary:hover{
 
                 reuseButton = `
                     <div style="margin-top:16px;">
-                        <a
-                            href="post-new.php?source=ai_generated&content=${encodedContent}&images=${encodedImage}"
-                            class="btn btn-primary w-100"
-                            style="
-                                border-radius:12px;
-                                height:46px;
-                                display:flex;
-                                align-items:center;
-                                justify-content:center;
-                                gap:8px;
-                                font-weight:700;
-                            "
-                        >
-                            <i class="fas fa-plus"></i>
-                            Create from this
-                        </a>
+                        <a href="post-new.php?source=ai_generated&content=${encodedContent}&images=${encodedImage}" class="btn btn-primary w-100" style=" border-radius:12px; height:46px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700;"><i class="fas fa-plus"></i>Create from this</a>
                     </div>
                 `;
             }
