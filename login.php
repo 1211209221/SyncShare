@@ -150,6 +150,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 100%;
         }
     }
+    a.socialbu{
+        color: #04a3ce !important;
+        display: flex;
+        justify-content: center;
+        padding-top: 10px;
+        transition: 0.15s;
+    }
+
+    a.socialbu:hover{
+        color: #0084a8 !important;
+        transition: 0.15s;
+    }
 </style>
 </head>
 <body>
@@ -170,6 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <button type="submit">Login</button>
+            <a class="socialbu" href="https://socialbu.com/auth/register">Sign up with Socialbu</a>
 
             <?php if (!empty($error)) echo "<p class='error'>$error</p>"; ?>
         </form>

@@ -108,10 +108,14 @@ if ($isMastodon) {
     if (!empty($context['descendants'])) {
         foreach ($context['descendants'] as $reply) {
             $repliesData[] = [
-                "author" => $reply['account']['display_name'] ?? 'Unknown',
-                "handle" => $reply['account']['acct'] ?? '',
-                "content" => strip_tags($reply['content'] ?? ''),
-                "avatar" => $reply['account']['avatar'] ?? ''
+                "author"  => $reply['account']['display_name'] ?? 'Unknown',
+                "handle"  => $reply['account']['acct'] ?? '',
+                "content" => html_entity_decode(
+                    strip_tags($reply['content'] ?? ''),
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                ),
+                "avatar"  => $reply['account']['avatar'] ?? ''
             ];
         }
     }
