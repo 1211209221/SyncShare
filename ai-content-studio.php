@@ -13,8 +13,8 @@ $token = $_SESSION['token'];
  * GEMINI API KEY
  * =====================================================
  */
-$API_KEY = 'AIzaSyDLq9Ig9JU3l2CRUFv21AGl0F1Gi3FOdEM';
-
+$API_KEY = 'AQ.Ab8RN6JRz_ovOyhJ2mGRrXq0x7StTyDXAmjpDxycpzH4HYlk7w';
+// AIzaSyDLq9Ig9JU3l2CRUFv21AGl0F1Gi3FOdEM
 /**
  * =====================================================
  * SOCIALBU HELPER

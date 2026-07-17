@@ -1322,8 +1322,8 @@ textarea:focus {
                                                     <label for="metricsRange" class="form-label">Select Range:</label>
                                                     <select id="metricsRange" class="form-select" style="width:200px; display:inline-block;">
                                                         <!-- <option value="24h">First 24 Hours</option> -->
-                                                        <option value="all" selected>Overall</option>
-                                                        <option value="month">First Month</option>
+                                                        <!-- <option value="all" selected>Overall</option> -->
+                                                        <option value="month" selected>First Month</option>
                                                         <option value="week">First Week</option>
                                                     </select>
                                                 </div>
